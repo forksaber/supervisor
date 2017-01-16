@@ -1,0 +1,14 @@
+[{
+    "name": "a",
+    "command": "./a.rb",
+    "stdout_logfile": "log/a.log",
+    "redirect_stderr": true,
+    "startsecs" : 2
+  },
+  {
+    "name": "b",
+    "command": "./b.rb",
+    "stdout_logfile": "log/b.log",
+    "redirect_stderr": true
+  }
+]
