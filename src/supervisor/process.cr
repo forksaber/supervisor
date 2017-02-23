@@ -81,8 +81,8 @@ module Supervisor
           stderr.flush_on_newline = true
           @stdout = stdout
           @stderr = stderr
-          
-          ::Process.run(**spawn_opts) do |process|
+
+          ::CustomProcess.run(**spawn_opts) do |process|
             @process = process
             spawn_chan.send nil
             spawn do
@@ -94,7 +94,7 @@ module Supervisor
                 fire Event::STARTED, callback
               end
             end
-            
+
             wait_chan = Channel(Nil).new(1)
             spawn do
               process.error.each_line { |l| stderr.not_nil!.puts l }
@@ -142,7 +142,6 @@ module Supervisor
       sleep stop_wait
       if process.exists?
         group_pid = 0 - process.pid
-        puts group_pid
         ::Process.kill(Signal::KILL, group_pid)
         puts "Killed #{process.pid}"
       end
