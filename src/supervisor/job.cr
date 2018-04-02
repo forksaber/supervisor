@@ -7,7 +7,7 @@ module Supervisor
 
     @command = ""
     @stdout_logfile = "/dev/null"
-    @stderr_logfile : (String | Nil) = nil
+    @stderr_logfile = "/dev/null"
 
     getter env = {} of String => String
 
@@ -25,6 +25,9 @@ module Supervisor
 
     def initialize(attrs)
       update(attrs)
+      if @redirect_stderr && ! attrs.has_key?("stderr_logfile")
+        @stderr_logfile = @stdout_logfile
+      end
     end
 
     def command
@@ -37,7 +40,7 @@ module Supervisor
     end
 
     def stderr_logfile
-      @stderr_logfile ? absolute_path(@stderr_logfile.as(String)) : nil
+      absolute_path @stderr_logfile
     end
 
     def update(attrs)
