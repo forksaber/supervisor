@@ -1,8 +1,12 @@
 require "./state_machine"
+require "./state_stream"
 require "./custom_process"
+require "./logger"
 
 module Supervisor
   class Process
+
+    include Logger
 
     getter job : Job
     @process : (::Process | Nil)
@@ -15,52 +19,69 @@ module Supervisor
 
     def initialize(@job, name = nil)
       @name = name || @job.name
+      @state_stream = StateStream.new
       @fsm = StateMachine.new(
         retries: @job.startretries,
-        start_proc: -> (callback : EventCallback?) { start_process(callback); nil },
+        start_proc: -> { start_process; nil },
         stop_proc: -> { process = @process; stop_process(process, @job.stopwaitsecs) if process; nil },
-        autorestart: @job.autorestart
+        autorestart: @job.autorestart,
+        state_stream: @state_stream
       )
     end
 
-    def run 
-      fire Event::START, nil
+    def run
+      fire Event::START
     end
 
     def start
-      chan = Channel({Bool, State, Bool}).new
+      unsubscribe_proc = ->(prev : State, current : State) do
+        changed = (prev != current)
+        already_started = current.started? && !changed
+        if current.running? || current.stopped?
+          true
+        elsif already_started
+          true
+        else
+          false
+        end
+      end
+
+      chan = Channel({Bool, State, Bool}).new(1)
       callback = ->(prev : State, current : State) do
-        puts({prev, current})
+        logger.debug({prev, current})
         changed = (prev != current)
         already_started = current.started? && !changed
 
-        puts ">> #{@name}: #{prev} -> #{current}"
         if already_started
-          puts "already running"
           chan.send({true, current, changed})
-        elsif current == State::RUNNING
+        elsif current.running?
+          logger.info "started: #{@name}"
           chan.send({true, current, changed})
         elsif current.stopped?
           chan.send({false, current, changed})
         end
         nil
       end
-      fire Event::START, callback
+      @state_stream.subscribe(callback, unsubscribe_proc)
+      fire Event::START
       chan.receive
     end
 
     def stop
+      unsubscribe_proc = ->(prev : State, current : State) do
+        current.stopped? ? true : false
+      end
       chan = Channel({Bool, State, Bool}).new(1)
       callback = ->(prev : State, current : State) do
         changed = (prev != current)
-
-        puts "#{@name} -> #{current}"
         if current.stopped?
+          logger.info "stopped: #{@name}"
           chan.send({true, current, changed})
         end
         nil
       end
-      fire Event::STOP, callback
+      @state_stream.subscribe(callback, unsubscribe_proc)
+      fire Event::STOP
       x = chan.receive
     end
 
@@ -68,15 +89,16 @@ module Supervisor
       @fsm.fire(*args, **kwargs)
     end
 
-    private def start_process(callback : EventCallback?)
+    private def start_process
       spawn_chan = Channel(Nil).new(1)
       exception_chan = Channel(Nil).new(1)
       spawn do
+        puts "starting process"
         exit_chan = Channel(Nil).new(1)
         start_chan = Channel(Nil).new(1)
         begin
           stdout = File.open(@job.stdout_logfile, "a+")
-          stderr = @job.stderr_logfile ? File.open(@job.stderr_logfile.as(String), "a+") : File.open(@job.stdout_logfile, "a+")
+          stderr = File.open(@job.stderr_logfile, "a+")
           stdout.flush_on_newline = true
           stderr.flush_on_newline = true
           @stdout = stdout
@@ -91,13 +113,14 @@ module Supervisor
               when exit_chan.receive
               else
                 start_chan.send nil
-                fire Event::STARTED, callback
+                fire Event::STARTED
               end
             end
 
             wait_chan = Channel(Nil).new(1)
             spawn do
               process.error.each_line { |l| stderr.not_nil!.puts l }
+            ensure
               wait_chan.send nil
             end
             process.output.each_line { |l| stdout.puts l }
@@ -119,23 +142,21 @@ module Supervisor
           exit_chan.send nil
           select
           when start_chan.receive
-            fire Event::EXITED, nil
+            fire Event::EXITED
           else
-            puts "Exited"
-            fire Event::EXITED, callback, async: true
+            logger.debug "Exited"
+            fire Event::EXITED, async: true
           end
         end
       end
 
       select
       when spawn_chan.receive
-        puts "received"
       when exception_chan.receive
-        puts "ex-received"
       end
     end
 
-    private def stop_process(process : ::Process, stop_wait)
+    private def stop_process(process : ::Process, stop_wait : Number)
       process.kill
       sleep 0.05
       return if process.terminated?
@@ -153,13 +174,10 @@ module Supervisor
       {
         command: @job.command,
         chdir: @job.working_dir,
-        error: pipe_error,
+        output: ::Process::Redirect::Pipe,
+        error: ::Process::Redirect::Pipe,
         env: @job.env
       }
-    end
-
-    private def pipe_error
-      (@job.redirect_stderr || @job.stderr_logfile) ? nil : false
     end
 
   end
