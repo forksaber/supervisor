@@ -6,6 +6,6 @@ module Supervisor
     EXITED
     RETRY
     FATAL
-    END
+    SHUTDOWN
   end
 end

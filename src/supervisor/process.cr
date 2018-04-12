@@ -83,7 +83,7 @@ module Supervisor
         nil
       end
       @fsm.subscribe(callback, unsubscribe_proc)
-      fire Event::START
+      fire Event::START, async: false
       chan.receive
     end
 
@@ -102,7 +102,7 @@ module Supervisor
         nil
       end
       @fsm.subscribe(callback, unsubscribe_proc)
-      fire Event::STOP
+      fire Event::STOP, async: false
       chan.receive
     end
 
@@ -112,7 +112,7 @@ module Supervisor
       _, ok = @shutdown.compare_and_set(Shutdown::NOT_STARTED, Shutdown::IN_PROGRESS)
       return false if ! ok
       stop
-      fire Event::END
+      fire Event::SHUTDOWN, async: false
       true
     end
 
@@ -145,7 +145,7 @@ module Supervisor
                 start_chan.send nil
                 logger.info "(#{@group_id}) (#{@name}) Pid: ##{process.pid}"
                 @started_at = Time.now.epoch
-                fire Event::STARTED
+                fire Event::STARTED, async: false
               end
             end
 
@@ -174,10 +174,10 @@ module Supervisor
           exit_chan.send nil
           select
           when start_chan.receive
-            fire Event::EXITED
+            fire Event::EXITED, async: false
           else
             logger.debug "Exited"
-            fire Event::EXITED, async: true
+            fire Event::EXITED, async: false
           end
         end
       end
