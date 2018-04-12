@@ -1,25 +1,37 @@
-require "./supervisor/*"
-require "json"
+require "./supervisor/process_registry"
+require "./supervisor/server"
+require "./supervisor/client"
+require "./supervisor/ctl"
 
 module Supervisor
-  # TODO Put your code here
+
+  def self.server
+    registry = ProcessRegistry.new
+    on_start = ->() { nil }
+    server = Server.new(registry)
+    server.start(on_start)
+  end
+
+  def self.fgserver
+    registry = Supervisor::ProcessRegistry.new
+    on_start = ->() do
+      spawn do
+        rolling_restart
+      end
+      nil
+    end
+    server = Supervisor::Server.new(registry)
+    server.start(on_start)
+  end
+
+  def self.rolling_restart
+    ctl = Supervisor::Ctl.new
+    ctl.rolling_restart
+  end
+
+  def self.status
+    ctl = Supervisor::Ctl.new
+    ctl.status
+  end
+
 end
-
-jobs_config = Array(Hash(String, (String | Hash(String, String) | Int32 | Bool))).from_json(File.read("config/jobs.yml"))
-puts jobs_config
-
-jobs = [] of Supervisor::Job
-jobs_config.each do |job|
-  j = Supervisor::Job.new(job)
-  jobs << j
-end
-
-channel = Channel(Nil).new
-
-process = Supervisor::Process.new(jobs[0])
-out = process.start
-puts "post start"
-puts process.stop
-puts "post stop"
-
-channel.receive
