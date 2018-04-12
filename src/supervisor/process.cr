@@ -4,7 +4,7 @@ require "./logger"
 require "atomic"
 
 module Supervisor
-  alias ProcessData = NamedTuple(name: String, group_id: String, state: String, pid: Int32)
+  alias ProcessData = NamedTuple(name: String, group_id: String, state: String, pid: Int32, started_at: Int64)
 
   class Process
 
@@ -17,6 +17,7 @@ module Supervisor
     @stdout : File?
     @stderr : File?
     @group_id : String
+    @started_at : Int64
 
     delegate state, to: @fsm
 
@@ -38,12 +39,19 @@ module Supervisor
         autorestart: @job.autorestart
       )
       @shutdown = Atomic(Shutdown).new(Shutdown::NOT_STARTED)
+      @started_at = 0_i64
     end
 
     def to_h
       process = @process
       pid = process ? process.pid : 0
-      ProcessData.new(name: @name, group_id: @group_id, state: state.to_s, pid: pid)
+      ProcessData.new(
+        name: @name,
+        group_id: @group_id,
+        state: state.to_s,
+        pid: pid,
+        started_at: @started_at
+      )
     end
 
     def start
@@ -136,6 +144,7 @@ module Supervisor
               else
                 start_chan.send nil
                 logger.info "(#{@group_id}) (#{@name}) Pid: ##{process.pid}"
+                @started_at = Time.now.epoch
                 fire Event::STARTED
               end
             end
