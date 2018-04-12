@@ -8,6 +8,6 @@ targets:
   supervisor:
     main: src/supervisor.cr
 
-crystal: 0.20.4
+crystal: 0.24.2
 
 license: MIT
