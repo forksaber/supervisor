@@ -4,7 +4,7 @@ require "./logger"
 require "atomic"
 
 module Supervisor
-  alias ProcessData = NamedTuple(name: String, group_id: String, state: String, pid: Int32, started_at: Int64)
+  alias ProcessData = NamedTuple(name: String, group_id: String, state: State, pid: Int32, started_at: Int64)
 
   class Process
 
@@ -48,7 +48,7 @@ module Supervisor
       ProcessData.new(
         name: @name,
         group_id: @group_id,
-        state: state.to_s,
+        state: state,
         pid: pid,
         started_at: @started_at
       )
