@@ -2,10 +2,11 @@ module Supervisor
   class Job
 
     getter name = ""
+    getter group_id : String
     getter working_dir = Dir.current
     getter stopsignal = "TERM"
 
-    @command = ""
+    getter command = ""
     @stdout_logfile = "/dev/null"
     @stderr_logfile = "/dev/null"
 
@@ -23,16 +24,15 @@ module Supervisor
     def_hash @name, @working_dir, @stdout_logfile,
              @stderr_logfile, @redirect_stderr
 
-    def initialize(attrs)
+    def initialize(attrs, group_id)
       update(attrs)
       if @redirect_stderr && ! attrs.has_key?("stderr_logfile")
         @stderr_logfile = @stdout_logfile
       end
-    end
-
-    def command
-      return @command if !@command =~ /\A\.\//
-      @command.gsub(/\A\.\//, "#{@working_dir}/")
+      @group_id = group_id
+      if @command =~ /\A\.\//
+        @command = @command.gsub(/\A\.\//, "#{@working_dir}/")
+      end
     end
 
     def stdout_logfile
@@ -47,6 +47,15 @@ module Supervisor
       attrs.each do |key, value|
         set key, value
       end
+    end
+
+    def to_processes(num_instances)
+      arr = [] of Process
+      (0..num_instances-1).each do |i|
+        name = "#{@name}_#{i.to_s.rjust(2, '0')}"
+        arr << Process.new(name: name, job: self)
+      end
+      arr
     end
 
     private def set(key, value)
