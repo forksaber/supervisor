@@ -1,6 +1,7 @@
 require "./state_machine"
 require "./custom_process"
 require "./logger"
+require "atomic"
 
 module Supervisor
   alias ProcessData = NamedTuple(name: String, group_id: String, state: String, pid: Int32)
@@ -9,15 +10,21 @@ module Supervisor
 
     include Logger
 
-    getter job : Job
     getter name : String
-    @process : (::Process | Nil)
+    getter job : Job
+    @process : ::Process?
     @fsm : StateMachine
     @stdout : File?
     @stderr : File?
     @group_id : String
 
     delegate state, to: @fsm
+
+    enum Shutdown
+      NOT_STARTED
+      IN_PROGRESS
+      COMPLETED
+    end
 
     def initialize(@job, name)
       @name = name
@@ -30,6 +37,7 @@ module Supervisor
         stop_proc: -> { process = @process; stop_process(process, @job.stopwaitsecs) if process; nil },
         autorestart: @job.autorestart
       )
+      @shutdown = Atomic(Shutdown).new(Shutdown::NOT_STARTED)
     end
 
     def to_h
@@ -88,6 +96,16 @@ module Supervisor
       @fsm.subscribe(callback, unsubscribe_proc)
       fire Event::STOP
       chan.receive
+    end
+
+    def shutdown
+      return true if @shutdown == Shutdown::COMPLETED
+      return false if @shutdown == Shutdown::IN_PROGRESS
+      _, ok = @shutdown.compare_and_set(Shutdown::NOT_STARTED, Shutdown::IN_PROGRESS)
+      return false if ! ok
+      stop
+      fire Event::END
+      true
     end
 
     private def fire(*args, **kwargs)
