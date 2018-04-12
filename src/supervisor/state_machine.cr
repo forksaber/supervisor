@@ -32,6 +32,7 @@ module Supervisor
   end
 
   alias EventCallback = Proc(State, State, Nil)
+  alias UnsubscribeProc =  Proc(State, State, Bool)
 
   class StateMachine
 
@@ -41,13 +42,17 @@ module Supervisor
     getter start_proc : Proc(Void)
     getter stop_proc : Proc(Void)
 
+    @name : String
+    @group_id : String
     @try_count = 0
     @chan = Channel(Event).new
     @retries : Int32
     @autorestart : Bool
-    @state_stream : StateStream
+    @mutex : Mutex
 
-    def initialize(@retries, @start_proc, @stop_proc, @autorestart, @state_stream)
+    def initialize(@name, @group_id, @retries, @start_proc, @stop_proc, @autorestart)
+      @mutex = Mutex.new
+      @subscriptions = Hash(EventCallback, UnsubscribeProc).new
       listen
     end
 
@@ -59,10 +64,15 @@ module Supervisor
       end
     end
 
+    def subscribe(callback : EventCallback, unsubscribe_proc : UnsubscribeProc)
+      @mutex.synchronize { @subscriptions[callback] = unsubscribe_proc }
+    end
+
     private def listen
       spawn do
         loop do
           event = @chan.receive
+          break if event == Event::END && @state.stopped?
           process_event event
         end
       end
@@ -122,7 +132,25 @@ module Supervisor
         puts "unknown state/event combo: #{@state}, #{event}"
       end
 
-      @state_stream.publish(prev_state, @state)
+      publish(prev_state, @state)
     end
+
+    private def publish(prev_state : State, curr_state : State)
+      log(prev_state, curr_state)
+      @mutex.synchronize do
+        @subscriptions.each do |event_callback, unsubscribe_proc|
+          event_callback.call(prev_state, curr_state)
+          @subscriptions.delete(event_callback) if unsubscribe_proc.call(prev_state, curr_state)
+        end
+      end
+    end
+
+    private def log(prev_state : State, curr_state : State)
+      changed = (prev_state != curr_state)
+      if changed
+        logger.info "(#{@group_id}) (#{@name}) #{curr_state}"
+      end
+    end
+
   end
 end

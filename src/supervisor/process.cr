@@ -1,36 +1,41 @@
 require "./state_machine"
-require "./state_stream"
 require "./custom_process"
 require "./logger"
 
 module Supervisor
+  alias ProcessData = NamedTuple(name: String, group_id: String, state: String, pid: Int32)
+
   class Process
 
     include Logger
 
     getter job : Job
+    getter name : String
     @process : (::Process | Nil)
-    @name : String
     @fsm : StateMachine
     @stdout : File?
     @stderr : File?
+    @group_id : String
 
     delegate state, to: @fsm
 
-    def initialize(@job, name = nil)
-      @name = name || @job.name
-      @state_stream = StateStream.new
+    def initialize(@job, name)
+      @name = name
+      @group_id = @job.group_id
       @fsm = StateMachine.new(
+        name: @name,
+        group_id: @group_id,
         retries: @job.startretries,
         start_proc: -> { start_process; nil },
         stop_proc: -> { process = @process; stop_process(process, @job.stopwaitsecs) if process; nil },
-        autorestart: @job.autorestart,
-        state_stream: @state_stream
+        autorestart: @job.autorestart
       )
     end
 
-    def run
-      fire Event::START
+    def to_h
+      process = @process
+      pid = process ? process.pid : 0
+      ProcessData.new(name: @name, group_id: @group_id, state: state.to_s, pid: pid)
     end
 
     def start
@@ -55,19 +60,20 @@ module Supervisor
         if already_started
           chan.send({true, current, changed})
         elsif current.running?
-          logger.info "started: #{@name}"
           chan.send({true, current, changed})
         elsif current.stopped?
           chan.send({false, current, changed})
         end
         nil
       end
-      @state_stream.subscribe(callback, unsubscribe_proc)
+      @fsm.subscribe(callback, unsubscribe_proc)
       fire Event::START
       chan.receive
     end
 
     def stop
+      state = self.state
+      return {true, state, false} if state.stopped?
       unsubscribe_proc = ->(prev : State, current : State) do
         current.stopped? ? true : false
       end
@@ -75,14 +81,13 @@ module Supervisor
       callback = ->(prev : State, current : State) do
         changed = (prev != current)
         if current.stopped?
-          logger.info "stopped: #{@name}"
           chan.send({true, current, changed})
         end
         nil
       end
-      @state_stream.subscribe(callback, unsubscribe_proc)
+      @fsm.subscribe(callback, unsubscribe_proc)
       fire Event::STOP
-      x = chan.receive
+      chan.receive
     end
 
     private def fire(*args, **kwargs)
@@ -93,7 +98,6 @@ module Supervisor
       spawn_chan = Channel(Nil).new(1)
       exception_chan = Channel(Nil).new(1)
       spawn do
-        puts "starting process"
         exit_chan = Channel(Nil).new(1)
         start_chan = Channel(Nil).new(1)
         begin
@@ -113,6 +117,7 @@ module Supervisor
               when exit_chan.receive
               else
                 start_chan.send nil
+                logger.info "(#{@group_id}) (#{@name}) Pid: ##{process.pid}"
                 fire Event::STARTED
               end
             end
