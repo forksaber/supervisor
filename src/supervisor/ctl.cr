@@ -42,12 +42,34 @@ module Supervisor
       current_group = registry[:current_group]
       old_groups = registry[:old_groups]
 
+      template = "| %-20s | %-10s | %-5s | %15s | %6s |\n"
+
       puts "current_group: #{current_group}"
+      puts "-" * 72
+      printf template, "name", "state", "pid", "uptime", "group"
+      puts "-" * 72
       processes.each do |group, group_data|
         group_data.each do |name, process|
-          printf "%10s | %-20s | %5s | %10s\n", group, name, process[:pid], process[:state]
+          uptime = uptime(process[:started_at], process[:state])
+          printf template, name, process[:state], process[:pid], uptime, group
         end
       end
     end
+
+    private def uptime(started_at, state)
+      return "-" if state != "RUNNING"
+      uptime = (Time.now.epoch - started_at)
+      mm, ss = uptime.divmod(60)
+      hh, mm = mm.divmod(60)
+      dd, hh = hh.divmod(24)
+      if dd == 1
+        "%d day, %02d::%02d::%02d" % [dd, hh, mm, ss]
+      elsif dd > 1
+        "%d days, %02d::%02d::%02d" % [dd, hh, mm, ss]
+      else
+        "%02d::%02d::%02d" % [hh, mm, ss]
+      end
+    end
+
   end
 end
