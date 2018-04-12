@@ -1,3 +1,4 @@
+require "logger"
 module Supervisor
   module Logger
     @@logger = ::Logger.new(STDOUT)
