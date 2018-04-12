@@ -28,11 +28,11 @@ module Supervisor
       listen
     end
 
-    def fire(event : Supervisor::Event, async = false)
+    def fire(event : Event, async = true)
       if async
-        @chan.send(event)
-      else
         spawn { @chan.send(event) }
+      else
+        @chan.send(event)
       end
     end
 
@@ -44,7 +44,7 @@ module Supervisor
       spawn do
         loop do
           event = @chan.receive
-          break if event == Event::END && @state.stopped?
+          break if event == Event::SHUTDOWN && @state.stopped?
           process_event event
         end
       end
