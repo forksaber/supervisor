@@ -1,35 +1,7 @@
+require "./logger"
+require "./state"
+require "./event"
 module Supervisor
-
-  enum State
-    STOPPED
-    FATAL
-    EXITED
-    STARTING
-    BACKOFF
-    RUNNING
-    STOPPING
-
-    def stopped?
-      [STOPPED, FATAL].includes? self
-    end
-
-    def started?
-      [STARTING, BACKOFF, RUNNING].includes? self
-    end
-
-    def running?
-      self == RUNNING
-    end
-  end
-
-  enum Event
-    START
-    STOP
-    STARTED
-    EXITED
-    RETRY
-    FATAL
-  end
 
   alias EventCallback = Proc(State, State, Nil)
   alias UnsubscribeProc =  Proc(State, State, Bool)
