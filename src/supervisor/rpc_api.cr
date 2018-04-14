@@ -38,28 +38,30 @@ module Supervisor
     private def reload
       @registry.reload
       {true, ""}
+    rescue e
+      {false, e.message}
     end
 
     private def start_process(group_id, name)
       process = @registry.find_process(group_id, name)
-      process.start
-      {true, ""}
+      ok, _, _ = process.start
+      {ok, ""}
     rescue
       {false, ""}
     end
 
     private def stop_process(group_id, name)
       process = @registry.find_process(group_id, name)
-      process.stop
-      {true, ""}
+      ok, _, _ = process.stop
+      {ok, ""}
     rescue
       {false, ""}
     end
 
     private def shutdown_process(group_id, name)
       process = @registry.find_process(group_id, name)
-      process.shutdown
-      {true, ""}
+      ok = process.shutdown
+      {ok, ""}
     rescue
       {false, ""}
     end
