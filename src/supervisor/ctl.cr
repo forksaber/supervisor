@@ -33,7 +33,7 @@ module Supervisor
     end
 
     def get_state
-      @client.call2("get_state")
+      @client.call("get_state", response_type: SerializedRegistry)
     end
 
     def status
