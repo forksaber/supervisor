@@ -74,21 +74,15 @@ module Supervisor
         @state = State::BACKOFF
         @try_count += 1
         if @try_count >= @retries
-          fire Event::FATAL
+          @state = State::FATAL
         else
-          fire Event::RETRY
+          @state = State::STARTING
+          @start_proc.call
         end
 
       when {State::STARTING, Event::STOP}
         @state = State::STOPPING
         @stop_proc.call
-
-      when {State::BACKOFF, Event::RETRY}
-        @state = State::STARTING
-        @start_proc.call
-
-      when {State::BACKOFF, Event::FATAL}
-        @state = State::FATAL
 
       when {State::RUNNING, Event::STOP}
         @state = State::STOPPING
@@ -96,7 +90,10 @@ module Supervisor
 
       when {State::RUNNING, Event::EXITED}
         @state = State::EXITED
-        fire Event::START if @autorestart
+        if @autorestart
+          @state = State::STARTING
+          @start_proc.call
+        end
 
       when {State::STOPPING, Event::EXITED}
         @state = State::STOPPED
