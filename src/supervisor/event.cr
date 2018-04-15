@@ -4,8 +4,6 @@ module Supervisor
     STOP
     STARTED
     EXITED
-    RETRY
-    FATAL
     SHUTDOWN
   end
 end
