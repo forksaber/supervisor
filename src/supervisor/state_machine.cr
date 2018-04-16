@@ -28,12 +28,8 @@ module Supervisor
       listen
     end
 
-    def fire(event : Event, async = true)
-      if async
-        spawn { @chan.send(event) }
-      else
-        @chan.send(event)
-      end
+    def fire(event : Event)
+      @chan.send(event)
     end
 
     def subscribe(callback : EventCallback, unsubscribe_proc : UnsubscribeProc)
