@@ -11,7 +11,7 @@ module Supervisor
     include Logger
 
     getter state = State::STOPPED
-    getter start_proc : Proc(Void)
+    getter start_proc : Proc(Channel(Nil), Channel(Nil), Void)
     getter stop_proc : Proc(Void)
 
     @name : String
@@ -22,18 +22,16 @@ module Supervisor
     @autorestart : Bool
     @mutex : Mutex
 
+    STOPPED_STATES = [State::STOPPED, State::FATAL, State::EXITED]
+
     def initialize(@name, @group_id, @retries, @start_proc, @stop_proc, @autorestart)
       @mutex = Mutex.new
       @subscriptions = Hash(EventCallback, UnsubscribeProc).new
       listen
     end
 
-    def fire(event : Event, async = true)
-      if async
-        spawn { @chan.send(event) }
-      else
-        @chan.send(event)
-      end
+    def fire(event : Event)
+      @chan.send(event)
     end
 
     def subscribe(callback : EventCallback, unsubscribe_proc : UnsubscribeProc)
@@ -52,55 +50,69 @@ module Supervisor
 
     private def process_event(event : Event)
       prev_state = @state
-      case {state, event}
-
-      when {State::STOPPED, Event::START}
-        @state = State::STARTING
-        @start_proc.call
-
-      when {State::FATAL, Event::START}
-        @state = State::STARTING
-        @start_proc.call
-
-      when {State::EXITED, Event::START}
-        @state = State::STARTING
-        @start_proc.call
-
-      when {State::STARTING, Event::STARTED}
-        @state = State::RUNNING
-        @try_count = 0
-
-      when {State::STARTING, Event::EXITED}
-        @state = State::BACKOFF
-        @try_count += 1
-        if @try_count >= @retries
-          @state = State::FATAL
-        else
-          @state = State::STARTING
-          @start_proc.call
-        end
-
-      when {State::STARTING, Event::STOP}
-        @state = State::STOPPING
-        @stop_proc.call
-
-      when {State::RUNNING, Event::STOP}
-        @state = State::STOPPING
-        @stop_proc.call
-
-      when {State::RUNNING, Event::EXITED}
-        @state = State::EXITED
-        if @autorestart
-          @state = State::STARTING
-          @start_proc.call
-        end
-
-      when {State::STOPPING, Event::EXITED}
-        @state = State::STOPPED
+      if STOPPED_STATES.includes? @state
+        start
       else
         puts "unknown state/event combo: #{@state}, #{event}"
       end
+    end
 
+    private def start
+      set_state State::STARTING
+      start_chan = Channel(Nil).new(1)
+      exit_chan = Channel(Nil).new(1)
+      spawn { @start_proc.call(start_chan, exit_chan) }
+      loop do
+        select
+        when start_chan.receive
+          @try_count = 0
+          set_state State::RUNNING
+          break
+        when exit_chan.receive
+          set_state State::EXITED
+          return retry_start
+        when event = @chan.receive
+          next if event != Event::STOP
+          stop exit_chan
+          return
+        end
+      end
+
+      loop do
+        select
+        when exit_chan.receive
+          set_state State::EXITED
+          return start
+        when event = @chan.receive
+          next if event != Event::STOP
+          stop exit_chan
+          return
+        end
+      end
+    end
+
+    private def retry_start
+      set_state State::BACKOFF
+      @try_count += 1
+      if @try_count >= @retries
+        set_state State::FATAL
+      else
+        start
+      end
+    end
+
+    private def stop(exit_chan)
+      state = @state
+      return if ! [State::STARTING, State::RUNNING].includes? state
+      set_state State::STOPPING
+      @stop_proc.call
+      exit_chan.receive
+      set_state State::STOPPED
+    end
+
+    private def set_state(state)
+      prev_state = @state
+      @state = state
       publish(prev_state, @state)
     end
 
