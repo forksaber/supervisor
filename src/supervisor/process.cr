@@ -106,6 +106,17 @@ module Supervisor
       chan.receive
     end
 
+    def reopen_logs
+      stdout = @stdout
+      stderr = @stderr
+      if stdout
+        stdout.reopen(File.open(@job.stdout_logfile, "a+"))
+      end
+      if stderr
+        stderr.reopen(File.open(@job.stderr_logfile, "a+"))
+      end
+    end
+
     def shutdown
       return true if @shutdown == Shutdown::COMPLETED
       return false if @shutdown == Shutdown::IN_PROGRESS
