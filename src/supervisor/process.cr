@@ -83,7 +83,7 @@ module Supervisor
         nil
       end
       @fsm.subscribe(callback, unsubscribe_proc)
-      fire Event::START, async: false
+      fire Event::START
       chan.receive
     end
 
@@ -102,7 +102,7 @@ module Supervisor
         nil
       end
       @fsm.subscribe(callback, unsubscribe_proc)
-      fire Event::STOP, async: false
+      fire Event::STOP
       chan.receive
     end
 
@@ -112,80 +112,71 @@ module Supervisor
       _, ok = @shutdown.compare_and_set(Shutdown::NOT_STARTED, Shutdown::IN_PROGRESS)
       return false if ! ok
       stop
-      fire Event::SHUTDOWN, async: false
+      fire Event::SHUTDOWN
       true
     end
 
-    private def fire(*args, **kwargs)
-      @fsm.fire(*args, **kwargs)
+    private def fire(event)
+      @fsm.fire(event)
     end
 
     private def start_process
-      spawn_chan = Channel(Nil).new(1)
-      exception_chan = Channel(Nil).new(1)
+      start_chan = Channel(Nil).new(1)
+      exit_chan = Channel(Nil).new(1)
+
       spawn do
-        exit_chan = Channel(Nil).new(1)
-        start_chan = Channel(Nil).new(1)
-        begin
-          stdout = File.open(@job.stdout_logfile, "a+")
-          stderr = File.open(@job.stderr_logfile, "a+")
-          stdout.flush_on_newline = true
-          stderr.flush_on_newline = true
-          @stdout = stdout
-          @stderr = stderr
-
-          ::CustomProcess.run(**spawn_opts) do |process|
-            @process = process
-            spawn_chan.send nil
-            spawn do
-              sleep @job.startsecs
-              select
-              when exit_chan.receive
-              else
-                start_chan.send nil
-                logger.info "(#{@group_id}) (#{@name}) Pid: ##{process.pid}"
-                @started_at = Time.now.epoch
-                fire Event::STARTED, async: false
-              end
-            end
-
-            wait_chan = Channel(Nil).new(1)
-            spawn do
-              process.error.each_line { |l| stderr.not_nil!.puts l }
-            ensure
-              wait_chan.send nil
-            end
-            process.output.each_line { |l| stdout.puts l }
-            wait_chan.receive
-          end
-
-        rescue e
-          puts "exception : #{e}"
-          exception_chan.send nil
-          process = @process
-          stop_process(process, 1) if process
-        ensure
-          @process.try &.wait
-          @process = nil
-          stdout.close if stdout
-          stderr.try &.close if stderr
-          @stdout = nil
-          @stderr = nil
-          exit_chan.send nil
-          select
-          when start_chan.receive
-            fire Event::EXITED, async: false
-          else
-            logger.debug "Exited"
-            fire Event::EXITED, async: false
-          end
+        select
+        when start_chan.receive
+          fire Event::STARTED
+          exit_chan.receive
+          fire Event::EXITED
+        when exit_chan.receive
+          fire Event::EXITED
         end
       end
+      spawn run_process(start_chan, exit_chan)
+    end
 
-      select
-      when spawn_chan.receive
-      when exception_chan.receive
+    private def run_process(start_chan, exit_chan)
+      stdout = File.open(@job.stdout_logfile, "a+")
+      stderr = File.open(@job.stderr_logfile, "a+")
+      stdout.flush_on_newline = true
+      stderr.flush_on_newline = true
+      @stdout = stdout
+      @stderr = stderr
+
+      ::CustomProcess.run(**spawn_opts) do |process|
+        @process = process
+
+        spawn do
+          sleep @job.startsecs
+          start_chan.send nil
+        end
+        logger.info "(#{@group_id}) (#{@name}) Pid: ##{process.pid}"
+        @started_at = Time.now.epoch
+
+        wait_chan = Channel(Nil).new(1)
+        spawn do
+          process.error.each_line { |l| stderr.not_nil!.puts l }
+        ensure
+          wait_chan.send nil
+        end
+        process.output.each_line { |l| stdout.puts l }
+        wait_chan.receive
       end
+
+    rescue e
+      puts "exception : #{e}"
+      process = @process
+      stop_process(process, 1) if process
+    ensure
+      @process.try &.wait
+      @process = nil
+      stdout.close if stdout
+      stderr.try &.close if stderr
+      @stdout = nil
+      @stderr = nil
+      exit_chan.send nil
     end
 
     private def stop_process(process : ::Process, stop_wait : Number)
