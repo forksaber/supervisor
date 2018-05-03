@@ -2,7 +2,7 @@ lib LibC
   fun setpgrp()
 end
 
-class CustomProcess < Process
+class Process
 
   def initialize(command : String, args = nil, env : Env = nil, clear_env : Bool = false, shell : Bool = false,
                  input : Stdio = Redirect::Close, output : Stdio = Redirect::Close, error : Stdio = Redirect::Close, chdir : String? = nil)
