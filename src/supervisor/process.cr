@@ -1,5 +1,5 @@
 require "./state_machine"
-require "./custom_process"
+require "./ext/process"
 require "./logger"
 require "atomic"
 
@@ -156,7 +156,7 @@ module Supervisor
       @stdout = stdout
       @stderr = stderr
 
-      ::CustomProcess.run(**spawn_opts) do |process|
+      ::Process.run(**spawn_opts) do |process|
         @process = process
 
         spawn do
