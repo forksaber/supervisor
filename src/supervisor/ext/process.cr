@@ -2,7 +2,12 @@ lib LibC
   fun setpgrp()
 end
 
+require "./signal_child_handler"
+
 class Process
+
+  @mutex = Mutex.new
+  @waited = false
 
   def initialize(command : String, args = nil, env : Env = nil, clear_env : Bool = false, shell : Bool = false,
                  input : Stdio = Redirect::Close, output : Stdio = Redirect::Close, error : Stdio = Redirect::Close, chdir : String? = nil)
@@ -60,10 +65,45 @@ class Process
       end
     end
 
-    @waitpid_future = Event::SignalChildHandler.instance.waitpid(pid)
+    proc = -> { waitpid }
+    @waitpid_future = Event::SignalChildHandler.instance.wait(pid, proc)
 
     fork_input.try &.close
     fork_output.try &.close
     fork_error.try &.close
+  end
+
+  private def initialize(@pid)
+    proc = -> { waitpid }
+    @waitpid_future = Event::SignalChildHandler.instance.wait(pid, proc)
+    @wait_count = 0
+  end
+
+  def waitpid
+    @mutex.synchronize do
+      ret = LibC.waitpid(pid, out exit_code, LibC::WNOHANG)
+      if ret == -1
+        raise Errno.new("waitpid") unless Errno.value == Errno::ECHILD
+      end
+      puts "waitpid #{pid} #{ret}"
+      @waited = true if pid == ret
+      {ret, exit_code}
+    end
+  end
+
+  def kill(sig = Signal::TERM)
+    kill(sig, @pid)
+  end
+
+  def killgroup(sig)
+    kill(sig, -@pid)
+  end
+
+  private def kill(sig, pid)
+    @mutex.synchronize do
+      return false if @waited
+      Process.kill(sig, pid)
+      true
+    end
   end
 end

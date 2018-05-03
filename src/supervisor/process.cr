@@ -191,14 +191,11 @@ module Supervisor
     end
 
     private def stop_process(process : ::Process, stop_wait : Number)
-      process.kill
-      sleep 0.05
-      return if process.terminated?
-      sleep stop_wait
-      if process.exists?
-        group_pid = 0 - process.pid
-        ::Process.kill(Signal::KILL, group_pid)
-        puts "Killed #{process.pid}"
+      ret = process.kill
+      return if !ret
+      spawn do
+        sleep stop_wait
+        process.killgroup(Signal::KILL)
       end
     rescue e
       puts "#{e}, #{process.pid}"
