@@ -5,8 +5,8 @@ require "./job"
 module Supervisor
 
   alias GroupData = Hash(String, ProcessData)
-  alias SerializedState = Hash(String, GroupData)
-  alias SerializedRegistry = NamedTuple(state: SerializedState, current_group: String, old_groups: Array(String))
+  alias StateData = Hash(String, GroupData)
+  alias RegistryData = NamedTuple(state: StateData, current_group: String, old_groups: Array(String))
 
   class ProcessRegistry
 
@@ -26,8 +26,13 @@ module Supervisor
       group[name]
     end
 
-    def get_state
-      data = SerializedState.new
+    def reopen
+      pr = @state[@current_group].values.first
+      pr.reopen_logs
+    end
+
+    def get_registry_data
+      data = StateData.new
       @state.each do |group, group_data|
         h = GroupData.new
         group_data.each do |name, process|
@@ -35,7 +40,7 @@ module Supervisor
         end
         data[group] = h
       end
-      SerializedRegistry.new(state: data, current_group: @current_group, old_groups: @old_groups)
+      RegistryData.new(state: data, current_group: @current_group, old_groups: @old_groups)
     end
 
     def reload

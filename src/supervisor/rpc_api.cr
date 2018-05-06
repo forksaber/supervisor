@@ -13,8 +13,8 @@ module Supervisor
         reload
       when "start"
         start
-      when "get_state"
-        get_state
+      when "get_registry_data"
+        get_registry_data
       when "start_process"
         group_id = args[0]
         name = args[1]
@@ -27,6 +27,9 @@ module Supervisor
         group_id = args[0]
         name = args[1]
         shutdown_process(group_id, name)
+      when "shutdown_processes"
+        processes = args
+        shutdown_processes(processes)
       when "remove_old_groups"
         remove_old_groups
       else
@@ -66,9 +69,31 @@ module Supervisor
       {false, ""}
     end
 
+    private def shutdown_processes(processes)
+      count = processes.size
+      chan = Channel({Bool, String, String}).new(count)
+      processes.each do |i|
+        group, _,  name = i.as(String).partition(':')
+        process = @registry.find_process(group, name)
+        spawn { ok = process.shutdown; chan.send({ok, group, name}) }
+      end
 
-    private def get_state
-      data = @registry.get_state
+      errors = [] of String
+      count.times do |i|
+        ok, group, name = chan.receive
+        errors << "#{group}:#{name}" if ! ok
+      end
+      if errors.size == 0
+        {true, ""}
+      else
+        {false, "#{errors.join(", ")}"}
+      end
+    rescue e
+      {false, e.message}
+    end
+
+    private def get_registry_data
+      data = @registry.get_registry_data
       {true, data}
     end
 
@@ -78,6 +103,7 @@ module Supervisor
     end
 
     private def start
+      @registry.reopen
       {true, ""}
     end
 
