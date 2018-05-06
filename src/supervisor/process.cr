@@ -118,12 +118,13 @@ module Supervisor
     end
 
     def shutdown
-      return true if @shutdown == Shutdown::COMPLETED
-      return false if @shutdown == Shutdown::IN_PROGRESS
+      return true if @shutdown.get == Shutdown::COMPLETED
+      return false if @shutdown.get == Shutdown::IN_PROGRESS
       _, ok = @shutdown.compare_and_set(Shutdown::NOT_STARTED, Shutdown::IN_PROGRESS)
       return false if ! ok
       stop
       fire Event::SHUTDOWN
+      @shutdown.set(Shutdown::COMPLETED)
       true
     end
 
