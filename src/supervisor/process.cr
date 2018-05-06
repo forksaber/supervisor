@@ -133,23 +133,12 @@ module Supervisor
     end
 
     private def start_process
-      start_chan = Channel(Nil).new(1)
-      exit_chan = Channel(Nil).new(1)
-
-      spawn do
-        select
-        when start_chan.receive
-          fire Event::STARTED
-          exit_chan.receive
-          fire Event::EXITED
-        when exit_chan.receive
-          fire Event::EXITED
-        end
-      end
-      spawn run_process(start_chan, exit_chan)
+      mutex = Mutex.new
+      spawn run_process(mutex)
     end
 
-    private def run_process(start_chan, exit_chan)
+    private def run_process(mutex)
+      exited = false
       stdout = File.open(@job.stdout_logfile, "a+")
       stderr = File.open(@job.stderr_logfile, "a+")
       stdout.flush_on_newline = true
@@ -162,7 +151,7 @@ module Supervisor
 
         spawn do
           sleep @job.startsecs
-          start_chan.send nil
+          mutex.synchronize { fire Event::STARTED if ! exited }
         end
         logger.info "(#{@group_id}) (#{@name}) Pid: ##{process.pid}"
         @started_at = Time.now.epoch
@@ -182,13 +171,15 @@ module Supervisor
       process = @process
       stop_process(process, 1) if process
     ensure
-      @process.try &.wait
       @process = nil
       stdout.close if stdout
       stderr.try &.close if stderr
       @stdout = nil
       @stderr = nil
-      exit_chan.send nil
+      mutex.synchronize do
+        exited = true
+        fire Event::EXITED
+      end
     end
 
     private def stop_process(process : ::Process, stop_wait : Number)
