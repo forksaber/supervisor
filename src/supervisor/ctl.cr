@@ -1,5 +1,6 @@
 require "./client"
 require "./process_registry"
+require "colorize"
 
 module Supervisor
   class Ctl
@@ -10,10 +11,18 @@ module Supervisor
 
     def rolling_restart
       @client.call("reload")
-      registry = get_state
+      registry = get_registry_data
       processes = registry[:state]
       current_group = registry[:current_group]
       old_groups = registry[:old_groups]
+
+      unneeded_processes = unneeded_processes(processes, current_group, old_groups)
+
+      unneeded_processes.each do |i|
+        group, _, name = i.partition(':')
+        puts "removing #{name} (#{group})"
+      end
+      @client.call("shutdown_processes", unneeded_processes)
 
       current_processes = processes[current_group]
       current_processes.each do |name, process|
@@ -22,38 +31,37 @@ module Supervisor
           next if ! old_processes.has_key?(name)
           old_process = old_processes[name]
           group_id = old_process["group_id"]
-          puts "stopping #{group_id} -> #{name}"
-#          @client.call("shutdown_process", [old_process["group_id"], old_process["name"]])
+          puts "#{"stopping".colorize(:red)} #{name} (#{group_id})"
+          @client.call("shutdown_process", [old_process["group_id"], old_process["name"]])
         end
         group_id = process["group_id"]
-        puts "starting #{group_id} -> #{name}"
+        puts "#{"starting".colorize(:green)} #{name} (#{group_id})"
         @client.call("start_process", [process["group_id"], process["name"]])
       end
       @client.call("remove_old_groups")
     end
 
-    def get_state
-      @client.call("get_state", response_type: SerializedRegistry)
-    end
-
     def status
-      registry = get_state
+      registry = get_registry_data
       processes = registry[:state]
       current_group = registry[:current_group]
       old_groups = registry[:old_groups]
 
       template = "| %-20s | %-10s | %-5s | %15s | %6s |\n"
-
+      line = "-" * 72
       puts "current_group: #{current_group}"
-      puts "-" * 72
+      puts line
       printf template, "name", "state", "pid", "uptime", "group"
-      puts "-" * 72
+      puts line
       processes.each do |group, group_data|
         group_data.each do |name, process|
           uptime = uptime(process[:started_at], process[:state])
           printf template, name, process[:state], process[:pid], uptime, group
         end
       end
+      puts line
+      @client.call("start")
+
     end
 
     private def uptime(started_at, state)
@@ -71,5 +79,20 @@ module Supervisor
       end
     end
 
+    private def unneeded_processes(state, current_group, old_groups)
+      unneeded = [] of String
+      current_processes = state[current_group]
+      old_groups.each do |g|
+        processes = state[g]
+        processes.each do |name, _|
+          unneeded << "#{g}:#{name}" if ! current_processes.has_key?(name)
+        end
+      end
+      unneeded
+    end
+
+    private def get_registry_data
+      @client.call("get_registry_data", response_type: RegistryData)
+    end
   end
 end

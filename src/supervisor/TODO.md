@@ -4,13 +4,16 @@ DONE
 - [x] add uptime
 - [x] refactor rpc call2
 
-PENDING
-- [ ] job: support env ..with %(process_num)
-- [ ] add linear/exponential backoff
+ORDER:
+- [x] remove unneeded processes first
 - [ ] server: implement shutdown(parallel stop with channel synchro)
-- [ ] take abstract socket lock when running rr
-- [ ] remove unneeded processes first
+- [ ] job: support env ..with %(process_num)
 - [ ] env overrides
+
+
+PENDING
+- [ ] add linear/exponential backoff
+- [ ] take abstract socket lock when running rr
 
 MAYBE
 - [ ] read config from tmp/sv.yml, jobs.yml when running in daemon mode
