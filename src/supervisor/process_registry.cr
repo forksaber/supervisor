@@ -1,6 +1,6 @@
 require "yaml"
 require "./process"
-require "./job"
+require "./config"
 
 module Supervisor
 
@@ -44,10 +44,9 @@ module Supervisor
     end
 
     def reload
-      instances = read_config
-      group_id, jobs  = read_jobs
+      instances, group_id, jobs = Config.read(Dir.current)
       jobs.each do |j|
-        n = instances.fetch(j.name, 0)
+        n = instances.fetch(j.name, 0).as(Int32)
         next if n <= 0
         processes = j.to_processes(n)
         h = {} of String => Process
@@ -82,22 +81,6 @@ module Supervisor
           @old_groups.delete(i)
         end
       end
-    end
-
-    private def read_jobs
-      jobs_config = Array(Hash(String, (String | Hash(String, String) | Int32 | Bool))).from_yaml(File.read("config/jobs.yml"))
-      jobs = [] of Supervisor::Job
-      group_id = Random::Secure.hex(3)
-      jobs_config.each do |job|
-        j = Supervisor::Job.new(job, group_id)
-        jobs << j
-      end
-      {group_id, jobs}
-    end
-
-    private def read_config
-      config = Hash(String, Hash(String, Int32)).from_yaml(File.read("config/sv.yml"))
-      config.fetch "instances"
     end
   end
 end
