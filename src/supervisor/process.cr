@@ -12,6 +12,7 @@ module Supervisor
 
     getter name : String
     getter job : Job
+    getter env : Hash(String, String)
     @process : ::Process?
     @fsm : StateMachine
     @stdout : File?
@@ -27,7 +28,7 @@ module Supervisor
       COMPLETED
     end
 
-    def initialize(@job, name)
+    def initialize(@job, name, @env)
       @name = name
       @group_id = @job.group_id
       @fsm = StateMachine.new(
@@ -199,7 +200,7 @@ module Supervisor
         chdir: @job.working_dir,
         output: ::Process::Redirect::Pipe,
         error: ::Process::Redirect::Pipe,
-        env: @job.env
+        env: env
       }
     end
 
