@@ -3,12 +3,14 @@ DONE
 - [x] state_machine: fix listen fiber leak
 - [x] add uptime
 - [x] refactor rpc call2
+- [x] use mutex to ensure started/exited ordering
+- [x] remove unneeded processes first
+- [x] job: support env ..with %<process_num>02d
 
 ORDER:
-- [x] remove unneeded processes first
 - [ ] server: implement shutdown(parallel stop with channel synchro)
-- [ ] job: support env ..with %(process_num)
 - [ ] env overrides
+- [ ] add working directory
 
 
 PENDING
@@ -24,7 +26,6 @@ MAYBE
 
 - [ ] show/log spawn errors (maybe)
 - [ ] autorestart: true(done), false(done), unexpected(not implemented)
-- [ ] can use mutex to ensure started/exited ordering
 - [ ] size based logrotate(needs shared fds for similar processes to account for log size)
 
 ISSUES

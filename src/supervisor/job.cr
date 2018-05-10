@@ -53,7 +53,7 @@ module Supervisor
       arr = [] of Process
       (0..num_instances-1).each do |i|
         name = "#{@name}_#{i.to_s.rjust(2, '0')}"
-        arr << Process.new(name: name, job: self)
+        arr << Process.new(name: name, job: self, env: expand_env(i))
       end
       arr
     end
@@ -73,6 +73,15 @@ module Supervisor
 
     private def absolute_path(path)
       File.expand_path(path, @working_dir)
+    end
+
+    private def expand_env(process_num)
+      vars = {process_num: process_num}
+      new_env = {} of String => String
+      env.each do |key, value|
+        new_env[key] = sprintf(value, vars)
+      end
+      new_env
     end
 
   end
