@@ -63,6 +63,8 @@ class Event::SignalChildHandler
     if ret == pid
       chan = @waiting[pid]
       chan.send Process::Status.new(exit_code)
+      @waiting.delete(pid)
+      @waitpid_procs.delete(pid)
     end
     return true
   end
