@@ -10,7 +10,7 @@ module Supervisor
     end
 
     def rolling_restart
-      @client.call("reload")
+      @client.call("reload", [Dir.current])
       registry = get_registry_data
       processes = registry[:state]
       current_group = registry[:current_group]
