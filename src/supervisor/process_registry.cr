@@ -43,8 +43,8 @@ module Supervisor
       RegistryData.new(state: data, current_group: @current_group, old_groups: @old_groups)
     end
 
-    def reload
-      instances, group_id, jobs = Config.read(Dir.current)
+    def reload(dir)
+      instances, group_id, jobs = Config.read(dir)
       jobs.each do |j|
         n = instances.fetch(j.name, 0).as(Int32)
         next if n <= 0

@@ -10,7 +10,8 @@ module Supervisor
     def handle_call(method, args)
       response = case method
       when "reload"
-        reload
+        dir = args[0].as(String)
+        reload(dir)
       when "start"
         start
       when "get_registry_data"
@@ -38,8 +39,8 @@ module Supervisor
       rpc_response(response[0], response[1])
     end
 
-    private def reload
-      @registry.reload
+    private def reload(dir)
+      @registry.reload(dir)
       {true, ""}
     rescue e
       {false, e.message}
