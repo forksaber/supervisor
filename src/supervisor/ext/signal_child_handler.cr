@@ -42,7 +42,6 @@ class Event::SignalChildHandler
     siginfo.si_pid = 0
     infop = pointerof(siginfo)
     ret = LibC.waitid(LibC::IdTypeT::P_ALL, 0, infop, LibC::WNOHANG | LibC::WNOWAIT | LibC::WEXITED)
-    puts siginfo
     if ret == 0
       pid = siginfo.si_pid
       return pid
