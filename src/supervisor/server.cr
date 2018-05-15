@@ -25,9 +25,9 @@ module Supervisor
     end
 
     private def handle_client(client)
-      loop do
+      shutdown = loop do
         json = NetString.read(client)
-        break if ! json
+        break false if ! json
         data = RpcRequest.from_json(json)
         name = data[:name]
         args = data[:args]
@@ -35,6 +35,7 @@ module Supervisor
         if response
           client << NetString.build(response)
         end
+        break true if name == "shutdown" && response[0]
       end
     rescue e : MalformedNetString
       client.puts "Error: #{e.message}"
@@ -45,6 +46,7 @@ module Supervisor
     ensure
       puts "client disconnected"
       client.close
+      exit 0 if shutdown
     end
   end
 end

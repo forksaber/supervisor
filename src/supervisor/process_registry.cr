@@ -59,10 +59,28 @@ module Supervisor
       @current_group = group_id
     end
 
+    def shutdown
+      shutdown_groups(@state.keys)
+      @state.each do |group, group_data|
+        raise "#{group} not stopped" if ! group_data.empty?
+      end
+    end
+
     def remove_old_groups
+      shutdown_groups(@old_groups)
+      @old_groups.each do |i|
+        group_data = @state.has_key?(i) ? @state[i] : GroupData.new
+        if group_data.empty?
+          @state.delete(i)
+          @old_groups.delete(i)
+        end
+      end
+    end
+
+    private def shutdown_groups(groups)
       chan = Channel({Bool, String, String}).new
       count = 0
-      @old_groups.each do |i|
+      groups.each do |i|
         group_data = @state[i]
         group_data.each do |name, process|
           count += 1
@@ -72,14 +90,6 @@ module Supervisor
       count.times do
         ok, group, name = chan.receive
         @state[group].delete(name) if ok
-      end
-
-      @old_groups.each do |i|
-        group_data = @state.has_key?(i) ? @state[i] : GroupData.new
-        if group_data.empty?
-          @state.delete(i)
-          @old_groups.delete(i)
-        end
       end
     end
   end

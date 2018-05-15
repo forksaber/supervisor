@@ -60,7 +60,11 @@ module Supervisor
         end
       end
       puts line
-      @client.call("start")
+    end
+
+    def shutdown
+      @client.call("shutdown")
+    end
 
     end
 

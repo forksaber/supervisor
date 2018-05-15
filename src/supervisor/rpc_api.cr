@@ -12,8 +12,6 @@ module Supervisor
       when "reload"
         dir = args[0].as(String)
         reload(dir)
-      when "start"
-        start
       when "get_registry_data"
         get_registry_data
       when "start_process"
@@ -33,6 +31,8 @@ module Supervisor
         shutdown_processes(processes)
       when "remove_old_groups"
         remove_old_groups
+      when "shutdown"
+        shutdown
       else
         {false, "unknown method #{method}"}
       end
@@ -103,9 +103,11 @@ module Supervisor
       {true, ""}
     end
 
-    private def start
-      @registry.reopen
+    private def shutdown
+      @registry.shutdown
       {true, ""}
+    rescue e
+      {false, e.message}
     end
 
     private def rpc_response(status, data)

@@ -16,21 +16,27 @@ def daemon(&block)
   end
 end
 
-
 require "./supervisor"
 abort "no command specified" if ARGV.size == 0
-command = ARGV.shift
-case command
-when "server"
-#  daemon do
-    Supervisor.server
-#  end
-when "fgserver"
-  Supervisor.fgserver
-when "rr"
-  Supervisor.rolling_restart
-when "status"
-  Supervisor.status
-else
-  puts "unknown command #{command}"
+begin
+  command = ARGV.shift
+  case command
+  when "server"
+  #  daemon do
+  #    set_nproc 1
+      Supervisor.server
+  #  end
+  when "fgserver"
+    Supervisor.fgserver
+  when "rr"
+    Supervisor.rolling_restart
+  when "status"
+    Supervisor.status
+  when "shutdown"
+    Supervisor.shutdown
+  else
+    puts "unknown command #{command}"
+  end
+rescue e
+  abort e.message
 end
