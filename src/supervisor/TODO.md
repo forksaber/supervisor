@@ -7,20 +7,20 @@ DONE
 - [x] remove unneeded processes first
 - [x] job: support env ..with %<process_num>02d
 - [x] config overrides
-
-ORDER:
-- [ ] server: implement shutdown(parallel stop with channel synchro)
-- [ ] add working directory
-
+- [x] reload(dir)....(sv rr) will reread config from current dir
+- [x] server: implement shutdown(parallel stop with channel synchro)
 
 PENDING
 - [ ] add linear/exponential backoff
 - [ ] take abstract socket lock when running rr
+- [ ] implement forced-shutdown
+- [ ] add stop/start commands
+- [ ] refactor state_machine to process_fsm
 
 MAYBE
+- [ ] implement fd/socket passing
 - [ ] state_machine: refactor to use state transitions
 - [ ] add logger
-- [ ] add sv.yml or process_manager
 - [ ] stop_proc: run in spawn
 
 - [ ] show/log spawn errors
