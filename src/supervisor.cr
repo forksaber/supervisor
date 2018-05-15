@@ -34,4 +34,8 @@ module Supervisor
     ctl.status
   end
 
+  def self.shutdown
+    ctl = Supervisor::Ctl.new
+    ctl.shutdown
+  end
 end
