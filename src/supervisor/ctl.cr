@@ -66,8 +66,6 @@ module Supervisor
       @client.call("shutdown")
     end
 
-    end
-
     private def uptime(started_at, state)
       return "-" if state !=  State::RUNNING
       uptime = (Time.now.epoch - started_at)
