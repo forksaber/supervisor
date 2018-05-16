@@ -1,3 +1,4 @@
+require "./process_tuple"
 module Supervisor
   class Job
 
@@ -33,14 +34,8 @@ module Supervisor
       if @command =~ /\A\.\//
         @command = @command.gsub(/\A\.\//, "#{@working_dir}/")
       end
-    end
-
-    def stdout_logfile
-      absolute_path @stdout_logfile
-    end
-
-    def stderr_logfile
-      absolute_path @stderr_logfile
+      @stdout_logfile = absolute_path(@stdout_logfile)
+      @stderr_logfile = absolute_path(@stderr_logfile)
     end
 
     def update(attrs)
@@ -52,8 +47,27 @@ module Supervisor
     def to_processes(num_instances)
       arr = [] of Process
       (0..num_instances-1).each do |i|
-        name = "#{@name}_#{i.to_s.rjust(2, '0')}"
-        arr << Process.new(name: name, job: self, env: expand_env(i))
+        t = ProcessTuple.new(
+          name: "#{@name}_#{i.to_s.rjust(2, '0')}",
+          group_id: @group_id,
+          command: @command,
+          working_dir: @working_dir,
+
+          stdout_logfile: @stdout_logfile,
+          stderr_logfile: @stderr_logfile,
+
+          env: expand_env(i),
+          autorestart: @autorestart,
+
+          stopsignal: Signal.parse(@stopsignal),
+          stopasgroup: @stopasgroup,
+          killasgroup: @killasgroup,
+
+          startsecs: @startsecs,
+          startretries: @startretries,
+          stopwaitsecs: @stopwaitsecs
+        )
+        arr << Process.new(t)
       end
       arr
     end
