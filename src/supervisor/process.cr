@@ -1,4 +1,4 @@
-require "./state_machine"
+require "./process_fsm"
 require "./ext/process"
 require "./logger"
 require "atomic"
@@ -10,17 +10,8 @@ module Supervisor
 
     include Logger
 
-    getter name : String
-    getter job : Job
-    getter env : Hash(String, String)
-    @process : ::Process?
-    @fsm : StateMachine
-    @stdout : File?
-    @stderr : File?
-    @group_id : String
-    @started_at : Int64
-
-    delegate state, to: @fsm
+    @fsm : ProcessFSM
+    delegate state, name, group_id, pid, started_at, to: @fsm
 
     enum Shutdown
       NOT_STARTED
@@ -28,30 +19,18 @@ module Supervisor
       COMPLETED
     end
 
-    def initialize(@job, name, @env)
-      @name = name
-      @group_id = @job.group_id
-      @fsm = StateMachine.new(
-        name: @name,
-        group_id: @group_id,
-        retries: @job.startretries,
-        start_proc: -> { start_process; nil },
-        stop_proc: -> { process = @process; stop_process(process, @job.stopwaitsecs) if process; nil },
-        autorestart: @job.autorestart
-      )
+    def initialize(tuple : ProcessTuple)
+      @fsm = ProcessFSM.new(tuple)
       @shutdown = Atomic(Shutdown).new(Shutdown::NOT_STARTED)
-      @started_at = 0_i64
     end
 
     def to_h
-      process = @process
-      pid = process ? process.pid : 0
       ProcessData.new(
-        name: @name,
-        group_id: @group_id,
+        name: name,
+        group_id: group_id,
         state: state,
         pid: pid,
-        started_at: @started_at
+        started_at: started_at
       )
     end
 
@@ -132,77 +111,5 @@ module Supervisor
     private def fire(event)
       @fsm.fire(event)
     end
-
-    private def start_process
-      mutex = Mutex.new
-      spawn run_process(mutex)
-    end
-
-    private def run_process(mutex)
-      exited = false
-      stdout = File.open(@job.stdout_logfile, "a+")
-      stderr = File.open(@job.stderr_logfile, "a+")
-      stdout.flush_on_newline = true
-      stderr.flush_on_newline = true
-      @stdout = stdout
-      @stderr = stderr
-
-      ::Process.run(**spawn_opts) do |process|
-        @process = process
-
-        spawn do
-          sleep @job.startsecs
-          mutex.synchronize { fire Event::STARTED if ! exited }
-        end
-        logger.info "(#{@group_id}) (#{@name}) Pid: ##{process.pid}"
-        @started_at = Time.now.epoch
-
-        wait_chan = Channel(Nil).new(1)
-        spawn do
-          process.error.each_line { |l| stderr.not_nil!.puts l }
-        ensure
-          wait_chan.send nil
-        end
-        process.output.each_line { |l| stdout.puts l }
-        wait_chan.receive
-      end
-
-    rescue e
-      puts "exception : #{e}"
-      process = @process
-      stop_process(process, 1) if process
-    ensure
-      @process = nil
-      stdout.close if stdout
-      stderr.try &.close if stderr
-      @stdout = nil
-      @stderr = nil
-      mutex.synchronize do
-        exited = true
-        fire Event::EXITED
-      end
-    end
-
-    private def stop_process(process : ::Process, stop_wait : Number)
-      ret = process.kill
-      return if !ret
-      spawn do
-        sleep stop_wait
-        process.killgroup(Signal::KILL)
-      end
-    rescue e
-      puts "#{e}, #{process.pid}"
-    end
-
-    private def spawn_opts
-      {
-        command: @job.command,
-        chdir: @job.working_dir,
-        output: ::Process::Redirect::Pipe,
-        error: ::Process::Redirect::Pipe,
-        env: env
-      }
-    end
-
   end
 end

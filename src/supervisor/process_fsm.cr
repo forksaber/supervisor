@@ -6,26 +6,39 @@ module Supervisor
   alias EventCallback = Proc(State, State, Nil)
   alias UnsubscribeProc =  Proc(State, State, Bool)
 
-  class StateMachine
+  class ProcessFSM
 
     include Logger
 
+    @popts : ProcessTuple
     getter state = State::STOPPED
-    getter start_proc : Proc(Void)
-    getter stop_proc : Proc(Void)
+    getter started_at : Int64 = 0_i64
 
-    @name : String
-    @group_id : String
     @try_count = 0
     @chan = Channel(Event).new
-    @retries : Int32
-    @autorestart : Bool
     @mutex : Mutex
+    @stdout : File?
+    @stderr : File?
+    @process : ::Process?
 
-    def initialize(@name, @group_id, @retries, @start_proc, @stop_proc, @autorestart)
+    def initialize(popts)
+      @popts = popts
       @mutex = Mutex.new
       @subscriptions = Hash(EventCallback, UnsubscribeProc).new
       listen
+    end
+
+    def name
+      @popts[:name]
+    end
+
+    def group_id
+      @popts[:group_id]
+    end
+
+    def pid
+      process = @process
+      process ? process.pid : 0
     end
 
     def fire(event : Event)
@@ -52,15 +65,15 @@ module Supervisor
 
       when {State::STOPPED, Event::START}
         @state = State::STARTING
-        @start_proc.call
+        start_process
 
       when {State::FATAL, Event::START}
         @state = State::STARTING
-        @start_proc.call
+        start_process
 
       when {State::EXITED, Event::START}
         @state = State::STARTING
-        @start_proc.call
+        start_process
 
       when {State::STARTING, Event::STARTED}
         @state = State::RUNNING
@@ -69,26 +82,28 @@ module Supervisor
       when {State::STARTING, Event::EXITED}
         @state = State::BACKOFF
         @try_count += 1
-        if @try_count >= @retries
+        if @try_count >= @popts[:startretries]
           @state = State::FATAL
         else
           @state = State::STARTING
-          @start_proc.call
+          start_process
         end
 
       when {State::STARTING, Event::STOP}
         @state = State::STOPPING
-        @stop_proc.call
+        process = @process
+        stop_process(process, @popts[:stopwaitsecs]) if process
 
       when {State::RUNNING, Event::STOP}
         @state = State::STOPPING
-        @stop_proc.call
+        process = @process
+        stop_process(process, @popts[:stopwaitsecs]) if process
 
       when {State::RUNNING, Event::EXITED}
         @state = State::EXITED
-        if @autorestart
+        if @popts[:autorestart]
           @state = State::STARTING
-          @start_proc.call
+          start_process
         end
 
       when {State::STOPPING, Event::EXITED}
@@ -113,9 +128,79 @@ module Supervisor
     private def log(prev_state : State, curr_state : State)
       changed = (prev_state != curr_state)
       if changed
-        logger.info "(#{@group_id}) (#{@name}) #{curr_state}"
+        logger.info "(#{group_id}) (#{name}) #{curr_state}"
       end
     end
 
+    private def start_process
+      mutex = Mutex.new
+      spawn run_process(mutex)
+    end
+
+    private def run_process(mutex)
+      exited = false
+      stdout = File.open(@popts[:stdout_logfile], "a+")
+      stderr = File.open(@popts[:stderr_logfile], "a+")
+      stdout.flush_on_newline = true
+      stderr.flush_on_newline = true
+      @stdout = stdout
+      @stderr = stderr
+
+      ::Process.run(**spawn_opts) do |process|
+        @process = process
+
+        spawn do
+          sleep @popts[:startsecs]
+          mutex.synchronize { fire Event::STARTED if ! exited }
+        end
+        logger.info "(#{group_id}) (#{name}) Pid: ##{process.pid}"
+        @started_at = Time.now.epoch
+
+        wait_chan = Channel(Nil).new(1)
+        spawn do
+          process.error.each_line { |l| stderr.not_nil!.puts l }
+        ensure
+          wait_chan.send nil
+        end
+        process.output.each_line { |l| stdout.puts l }
+        wait_chan.receive
+      end
+
+    rescue e
+      puts "exception : #{e}"
+      process = @process
+      stop_process(process, 1) if process
+    ensure
+      @process = nil
+      stdout.close if stdout
+      stderr.try &.close if stderr
+      @stdout = nil
+      @stderr = nil
+      mutex.synchronize do
+        exited = true
+        fire Event::EXITED
+      end
+    end
+
+    private def stop_process(process : ::Process, stop_wait : Number)
+      ret = process.kill
+      return if !ret
+      spawn do
+        sleep stop_wait
+        process.killgroup(Signal::KILL)
+      end
+    rescue e
+      puts "#{e}, #{process.pid}"
+    end
+
+    private def spawn_opts
+      {
+        command: @popts[:command],
+        chdir: @popts[:working_dir],
+        output: ::Process::Redirect::Pipe,
+        error: ::Process::Redirect::Pipe,
+        env: @popts[:env]
+      }
+    end
   end
 end
