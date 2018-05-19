@@ -17,6 +17,10 @@ PENDING
 - [ ] add stop/start commands
 - [ ] refactor state_machine to process_fsm
 
+
+figure out how nginx/apache does log writes with 32k buffer....with or without locks?
+
+
 MAYBE
 - [ ] implement fd/socket passing
 - [ ] state_machine: refactor to use state transitions
