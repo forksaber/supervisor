@@ -31,7 +31,8 @@ begin
     start_server
     Supervisor.rolling_restart
   when "status"
-    Supervisor.status
+    ok = Supervisor.status
+    puts "Stopped" if ! ok
   when "shutdown"
     Supervisor.shutdown
   else

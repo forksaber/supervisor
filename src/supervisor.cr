@@ -32,6 +32,10 @@ module Supervisor
   def self.status
     ctl = Supervisor::Ctl.new
     ctl.status
+    true
+  rescue e : Errno
+    raise e if e.errno != Errno::ECONNREFUSED
+    false
   end
 
   def self.shutdown
