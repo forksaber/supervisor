@@ -34,8 +34,12 @@ module Supervisor
         response = @api.handle_call(name, args)
         if response
           client << NetString.build(response)
+          break true if name == "shutdown" && response[0]
         end
-        break true if name == "shutdown" && response[0]
+        if name == "reload"
+          response = nil
+          GC.collect
+        end
       end
     rescue e : MalformedNetString
       client.puts "Error: #{e.message}"
