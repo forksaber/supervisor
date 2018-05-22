@@ -85,7 +85,9 @@ class Process
       if ret == -1
         raise Errno.new("waitpid") unless Errno.value == Errno::ECHILD
       end
-      puts "waitpid #{pid} #{ret}"
+      if pid != ret
+        puts "waitpid #{pid} #{ret}"
+      end
       @waited = true if pid == ret
       {ret, exit_code}
     end
