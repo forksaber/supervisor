@@ -2,33 +2,33 @@ STDIN.blocking = true
 STDOUT.blocking = true
 STDERR.blocking = true
 
-lib C
-  fun setsid : Int32
-end
+require "./supervisor"
 
-def daemon(&block)
-  Process.fork do
-    STDIN.close
-    STDOUT.reopen(File.open("#{Dir.current}/log/sv.log", "a+"))
-    STDERR.reopen(File.open("#{Dir.current}/log/sv.log", "a+"))
-    C.setsid
-    Process.fork { yield }
+def start_server
+  return if Supervisor.running?
+  puts "starting supervisor"
+  env = {"GC_UNMAP_THRESHOLD" => "2", "GC_FORCE_UNMAP_ON_GCOLLECT" => "true"}
+  path = Process.executable_path
+  raise "sv path no found" if ! path
+  Process.run path.not_nil!, args: {"server"} , env: env
+  loop do
+    sleep 0.5
+    break if Supervisor.running?
+    puts "connecting"
+    sleep 1.5
   end
 end
 
-require "./supervisor"
 abort "no command specified" if ARGV.size == 0
 begin
   command = ARGV.shift
   case command
   when "server"
-  #  daemon do
-  #    set_nproc 1
-      Supervisor.server
-  #  end
+    Supervisor.daemon
   when "fgserver"
     Supervisor.fgserver
   when "rr"
+    start_server
     Supervisor.rolling_restart
   when "status"
     Supervisor.status

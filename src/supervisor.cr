@@ -38,4 +38,30 @@ module Supervisor
     ctl = Supervisor::Ctl.new
     ctl.shutdown
   end
+
+  def self.running?
+    UNIXSocket.new("tmp/sv.sock")
+    true
+  rescue e
+    false
+  end
+
+  def self.daemon
+    daemonize { server }
+  end
+
+  private def self.daemonize(&block)
+    ::Process.fork do
+      STDIN.close
+      STDOUT.reopen(File.open("#{Dir.current}/log/sv.log", "a+"))
+      STDERR.reopen(File.open("#{Dir.current}/log/sv.log", "a+"))
+      C.setsid
+      ::Process.fork { yield }
+    end
+  end
 end
+
+lib C
+  fun setsid : Int32
+end
+
