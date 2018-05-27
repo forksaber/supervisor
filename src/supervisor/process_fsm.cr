@@ -196,6 +196,7 @@ module Supervisor
     private def spawn_opts
       {
         command: @popts[:command],
+        args: @popts[:command_args],
         chdir: @popts[:working_dir],
         output: ::Process::Redirect::Pipe,
         error: ::Process::Redirect::Pipe,

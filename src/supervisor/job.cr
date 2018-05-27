@@ -1,4 +1,5 @@
 require "./process_tuple"
+require "./command_parser"
 module Supervisor
   class Job
 
@@ -46,11 +47,13 @@ module Supervisor
 
     def to_processes(num_instances)
       arr = [] of Process
+      command, args = CommandParser.parse(@command)
       (0..num_instances-1).each do |i|
         t = ProcessTuple.new(
           name: "#{@name}_#{i.to_s.rjust(2, '0')}",
           group_id: @group_id,
-          command: @command,
+          command: command,
+          command_args: args,
           working_dir: @working_dir,
 
           stdout_logfile: @stdout_logfile,
@@ -97,6 +100,5 @@ module Supervisor
       end
       new_env
     end
-
   end
 end

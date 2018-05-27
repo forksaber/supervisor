@@ -11,6 +11,7 @@ DONE
 - [x] server: implement shutdown(parallel stop with channel synchro)
 
 PENDING
+- [x] make command strings with arguments work
 - [ ] add linear/exponential backoff
 - [ ] take abstract socket lock when running rr
 - [ ] implement forced-shutdown
