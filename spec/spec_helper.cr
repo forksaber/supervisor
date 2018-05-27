@@ -1,2 +1,2 @@
 require "spec"
-require "../src/supervisor"
+require "../src/supervisor/*"

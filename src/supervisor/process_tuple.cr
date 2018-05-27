@@ -3,6 +3,7 @@ module Supervisor
     name: String,
     group_id: String,
     command: String,
+    command_args: Array(String),
     working_dir: String,
 
     stdout_logfile: String,
