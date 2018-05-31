@@ -9,24 +9,21 @@ DONE
 - [x] config overrides
 - [x] reload(dir)....(sv rr) will reread config from current dir
 - [x] server: implement shutdown(parallel stop with channel synchro)
+- [x] make command strings with arguments work
+- [x] refactor state_machine to process_fsm
 
 PENDING
-- [x] make command strings with arguments work
 - [ ] add linear/exponential backoff
 - [ ] take abstract socket lock when running rr
 - [ ] implement forced-shutdown
 - [ ] add stop/start commands
-- [ ] refactor state_machine to process_fsm
-
 
 figure out how nginx/apache does log writes with 32k buffer....with or without locks?
-
 
 MAYBE
 - [ ] implement fd/socket passing
 - [ ] state_machine: refactor to use state transitions
 - [ ] add logger
-- [ ] stop_proc: run in spawn
 
 - [ ] show/log spawn errors
 - [ ] autorestart: true(done), false(done), unexpected(not implemented)
