@@ -17,8 +17,6 @@ module Supervisor
     @try_count = 0
     @chan = Channel(Event).new
     @mutex : Mutex
-    @stdout : File?
-    @stderr : File?
     @process : ::Process?
 
     def initialize(popts)
@@ -139,43 +137,21 @@ module Supervisor
 
     private def run_process(mutex)
       exited = false
-      stdout = File.open(@popts[:stdout_logfile], "a+")
-      stderr = File.open(@popts[:stderr_logfile], "a+")
-      stdout.flush_on_newline = true
-      stderr.flush_on_newline = true
-      @stdout = stdout
-      @stderr = stderr
-
-      ::Process.run(**spawn_opts) do |process|
-        @process = process
-
-        spawn do
-          sleep @popts[:startsecs]
-          mutex.synchronize { fire Event::STARTED if ! exited }
-        end
-        logger.info "(#{group_id}) (#{name}) Pid: ##{process.pid}"
-        @started_at = Time.now.epoch
-
-        wait_chan = Channel(Nil).new(1)
-        spawn do
-          process.error.each_line { |l| stderr.not_nil!.puts l }
-        ensure
-          wait_chan.send nil
-        end
-        process.output.each_line { |l| stdout.puts l }
-        wait_chan.receive
+      process = ::Process.new(**spawn_opts)
+      @process = process
+      spawn do
+        sleep @popts[:startsecs]
+        mutex.synchronize { fire Event::STARTED if ! exited }
       end
-
+      logger.info "(#{group_id}) (#{name}) Pid: ##{process.pid}"
+      @started_at = Time.now.epoch
+      process.wait
     rescue e
       puts "exception : #{e}"
       process = @process
       stop_process(process, 1) if process
     ensure
       @process = nil
-      stdout.close if stdout
-      stderr.try &.close if stderr
-      @stdout = nil
-      @stderr = nil
       mutex.synchronize do
         exited = true
         fire Event::EXITED
@@ -198,8 +174,8 @@ module Supervisor
         command: @popts[:command],
         args: @popts[:command_args],
         chdir: @popts[:working_dir],
-        output: ::Process::Redirect::Pipe,
-        error: ::Process::Redirect::Pipe,
+        output: @popts[:stdout_logfile],
+        error: @popts[:stderr_logfile],
         env: @popts[:env]
       }
     end
