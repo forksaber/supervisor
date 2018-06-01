@@ -11,6 +11,7 @@ DONE
 - [x] server: implement shutdown(parallel stop with channel synchro)
 - [x] make command strings with arguments work
 - [x] refactor state_machine to process_fsm
+- [x] application logs are not routed through sv
 
 PENDING
 - [ ] add linear/exponential backoff
@@ -24,9 +25,10 @@ MAYBE
 - [ ] implement fd/socket passing
 - [ ] state_machine: refactor to use state transitions
 - [ ] add logger
-
 - [ ] show/log spawn errors
 - [ ] autorestart: true(done), false(done), unexpected(not implemented)
+
+UNLIKELY
 - [ ] size based logrotate(needs shared fds for similar processes to account for log size)
 
 DESIGN ISSUES
