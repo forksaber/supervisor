@@ -10,7 +10,8 @@ def start_server
   env = {"GC_UNMAP_THRESHOLD" => "2", "GC_FORCE_UNMAP_ON_GCOLLECT" => "true"}
   path = Process.executable_path
   raise "sv path no found" if ! path
-  Process.run path.not_nil!, args: {"server"} , env: env
+  process = Process.new path.not_nil!, args: {"server"}, env: env, input: "/dev/null"
+  process.wait
   loop do
     sleep 0.5
     break if Supervisor.running?
@@ -35,6 +36,26 @@ begin
     puts "Stopped" if ! ok
   when "shutdown"
     Supervisor.shutdown
+  when "start"
+    arg = ARGV.shift
+    abort "expected argument <group>:<name>" if ! arg
+    group, _, name = arg.partition(':')
+    Supervisor.start_process(group, name)
+  when "stop"
+    arg = ARGV.shift
+    abort "expected argument <group>:<name>" if ! arg
+    group, _, name = arg.partition(':')
+    Supervisor.stop_process(group, name)
+  when "start_job"
+    arg = ARGV.shift
+    abort "expected argument <job_name>" if ! arg
+    group, _, job_name = arg.partition(':')
+    Supervisor.start_job(group, job_name)
+  when "stop_job"
+    arg = ARGV.shift
+    abort "expected argument <job_name>" if ! arg
+    group, _, job_name = arg.partition(':')
+    Supervisor.stop_job(group, job_name)
   else
     puts "unknown command #{command}"
   end
