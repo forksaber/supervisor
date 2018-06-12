@@ -9,6 +9,32 @@ module Supervisor
       @client = Client.new
     end
 
+    def start_process(group, name)
+      @client.call("start_process", [group, name])
+    end
+
+    def stop_process(group, name)
+      @client.call("stop_process", [group, name])
+    end
+
+    def start_job(group, job_name)
+      processes = job_processes(group, job_name)
+      raise "no such job #{job_name}" if processes.size == 0
+      processes.each do |group, name|
+        puts %(#{"starting".colorize(:green)} #{name} (#{group}))
+        start_process(group, name)
+      end
+    end
+
+    def stop_job(group, job_name)
+      processes = job_processes(group, job_name)
+      raise "no such job #{job_name}" if processes.size == 0
+      processes.each do |group, name|
+        puts %(#{"stopping".colorize(:red)} #{name} (#{group}))
+        stop_process(group, name)
+      end
+    end
+
     def rolling_restart
       @client.call("reload", [Dir.current])
       registry = get_registry_data
@@ -47,16 +73,16 @@ module Supervisor
       current_group = registry[:current_group]
       old_groups = registry[:old_groups]
 
-      template = "| %-20s | %-10s | %-5s | %15s | %6s |\n"
+      template = "| %6s  | %-20s | %-10s | %-5s | %15s |\n"
       line = "-" * 72
       puts "current_group: #{current_group}"
       puts line
-      printf template, "name", "state", "pid", "uptime", "group"
+      printf template, "group", "name", "state", "pid", "uptime"
       puts line
       processes.each do |group, group_data|
         group_data.each do |name, process|
           uptime = uptime(process[:started_at], process[:state])
-          printf template, name, process[:state], process[:pid], uptime, group
+          printf template, group, name, process[:state], process[:pid], uptime
         end
       end
       puts line
@@ -91,6 +117,18 @@ module Supervisor
         end
       end
       unneeded
+    end
+
+    private def job_processes(group, job_name)
+      processes = [] of {String, String}
+      registry = get_registry_data
+      state = registry[:state]
+      group_data = state[group]
+      group_data.each do |name, _|
+        n, match, _ = name.rpartition('_')
+        processes << {group, name} if (n == job_name && match == "_")
+      end
+      processes
     end
 
     private def get_registry_data

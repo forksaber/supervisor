@@ -43,6 +43,26 @@ module Supervisor
     ctl.shutdown
   end
 
+  def self.start_process(group, name)
+    ctl = Supervisor::Ctl.new
+    ctl.start_process(group, name)
+  end
+
+  def self.stop_process(group, name)
+    ctl = Supervisor::Ctl.new
+    ctl.stop_process(group, name)
+  end
+
+  def self.start_job(group, job_name)
+    ctl = Supervisor::Ctl.new
+    ctl.start_job(group, job_name)
+  end
+
+  def self.stop_job(group, job_name)
+    ctl = Supervisor::Ctl.new
+    ctl.stop_job(group, job_name)
+  end
+
   def self.running?
     UNIXSocket.new("tmp/sv.sock")
     true

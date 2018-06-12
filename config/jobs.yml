@@ -1,9 +1,12 @@
 [{
     "name": "a",
-    "command": "./a.rb",
+    "command": "./test_bin/a.rb \"my_arg\\\" 1\" '2'",
     "stdout_logfile": "log/a.log",
     "redirect_stderr": true,
-    "startsecs" : 2
+    "startsecs" : 2,
+    "env" : {
+      "PORT" : "51%<process_num>02d"
+     }
   },
   {
     "name": "b",
