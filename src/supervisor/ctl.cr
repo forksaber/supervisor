@@ -123,6 +123,9 @@ module Supervisor
       processes = [] of {String, String}
       registry = get_registry_data
       state = registry[:state]
+      if ! state.key?(group)
+        raise "no such group: #{group}"
+      end
       group_data = state[group]
       group_data.each do |name, _|
         n, match, _ = name.rpartition('_')

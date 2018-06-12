@@ -38,27 +38,31 @@ begin
     Supervisor.shutdown
   when "start"
     arg = ARGV.shift
-    abort "expected argument <group>:<name>" if ! arg
-    group, _, name = arg.partition(':')
+    raise "expected argument <group>:<name>" if ! arg
+    group, ok, name = arg.partition(':')
+    raise "expected argument <group>:<name>" if ok != ":"
     Supervisor.start_process(group, name)
   when "stop"
     arg = ARGV.shift
-    abort "expected argument <group>:<name>" if ! arg
-    group, _, name = arg.partition(':')
+    raise "expected argument <group>:<name>" if ! arg
+    group, ok, name = arg.partition(':')
+    raise "expected argument <group>:<name>" if ok != ":"
     Supervisor.stop_process(group, name)
   when "start_job"
     arg = ARGV.shift
-    abort "expected argument <job_name>" if ! arg
-    group, _, job_name = arg.partition(':')
+    raise "expected argument <job_name>" if ! arg
+    group, ok, job_name = arg.partition(':')
+    raise "expected argument <group>:<job_name>" if ok != ":"
     Supervisor.start_job(group, job_name)
   when "stop_job"
     arg = ARGV.shift
-    abort "expected argument <job_name>" if ! arg
-    group, _, job_name = arg.partition(':')
+    raise "expected argument <job_name>" if ! arg
+    group, ok, job_name = arg.partition(':')
+    raise "expected argument <group>:<job_name>" if ok != ":"
     Supervisor.stop_job(group, job_name)
   else
     puts "unknown command #{command}"
   end
 rescue e
-  abort e.message
+  abort "#{"ERROR".colorize(:red)} #{e.message}"
 end
