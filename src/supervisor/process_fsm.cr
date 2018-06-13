@@ -131,26 +131,25 @@ module Supervisor
     end
 
     private def start_process
-      mutex = Mutex.new
-      spawn run_process(mutex)
-    end
-
-    private def run_process(mutex)
-      exited = false
       process = ::Process.new(**spawn_opts)
       @process = process
+      @started_at = Time.now.epoch
+      logger.info "(#{group_id}) (#{name}) Pid: ##{process.pid}"
+      mutex = Mutex.new
+      spawn wait_process(process, mutex)
+    rescue e
+      puts "exception : #{e}"
+      stop_process(process, 1) if process
+      spawn { fire Event::EXITED }
+    end
+
+    private def wait_process(process, mutex)
+      exited = false
       spawn do
         sleep @popts[:startsecs]
         mutex.synchronize { fire Event::STARTED if ! exited }
       end
-      logger.info "(#{group_id}) (#{name}) Pid: ##{process.pid}"
-      @started_at = Time.now.epoch
       process.wait
-    rescue e
-      puts "exception : #{e}"
-      process = @process
-      stop_process(process, 1) if process
-    ensure
       @process = nil
       mutex.synchronize do
         exited = true
