@@ -38,22 +38,20 @@ class Process
     end
 
     proc = -> { waitpid }
-    @waitpid_future = Event::SignalChildHandler.instance.wait(pid, proc)
+    @waitpid = Crystal::SignalChildHandler.wait(pid, proc)
   end
 
   private def initialize(command : String, args = nil, env : Env = nil, clear_env : Bool = false, shell : Bool = false,
                  input : Stdio = Redirect::Close, output : Stdio = Redirect::Close, error : Stdio = Redirect::Close, chdir : String? = nil)
     @wait_count = 0
     @pid = 0
-    @waitpid_future = Concurrent::Future(Process::Status).new do
-      Process::Status.new(0)
-    end
+    @waitpid = Channel::Buffered(Int32).new(1)
     raise "initialization disabled intentionally : #{command}"
   end
 
   private def initialize(@pid)
     proc = -> { waitpid }
-    @waitpid_future = Event::SignalChildHandler.instance.wait(pid, proc)
+    @waitpid = Crystal::SignalChildHandler.wait(pid, proc)
     @wait_count = 0
   end
 
