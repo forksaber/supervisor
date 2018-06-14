@@ -123,7 +123,7 @@ module Supervisor
       processes = [] of {String, String}
       registry = get_registry_data
       state = registry[:state]
-      if ! state.key?(group)
+      if ! state.has_key?(group)
         raise "no such group: #{group}"
       end
       group_data = state[group]
