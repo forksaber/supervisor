@@ -53,8 +53,26 @@ module Supervisor
           event = @chan.receive
           break if event == Event::SHUTDOWN && @state.stopped?
           process_event event
+          next if @state != State::BACKOFF
+          handle_backoff
         end
       end
+    end
+
+    private def handle_backoff
+      t = {@try_count, 60}.min
+      backoff_chan = Channel(Nil).new(1)
+      spawn { sleep t; backoff_chan.send  nil }
+      event = loop do
+        select
+        when backoff_chan.receive
+          break Event::START
+        when e = @chan.receive
+          break e if {Event::START, Event::STOP}.includes? e
+          puts "unexpected event #{e} received in backoff state"
+        end
+      end
+      process_event event
     end
 
     private def process_event(event : Event)
@@ -82,10 +100,14 @@ module Supervisor
         @try_count += 1
         if @try_count >= @popts[:startretries]
           @state = State::FATAL
-        else
-          @state = State::STARTING
-          start_process
         end
+
+      when {State::BACKOFF, Event::START}
+        @state = State::STARTING
+        start_process
+
+      when {State::BACKOFF, Event::STOP}
+        @state = State::STOPPED
 
       when {State::STARTING, Event::STOP}
         @state = State::STOPPING
@@ -125,8 +147,13 @@ module Supervisor
 
     private def log(prev_state : State, curr_state : State)
       changed = (prev_state != curr_state)
+      if curr_state == State::BACKOFF
+        state_info = "#{curr_state} for #{{@try_count, 60}.min} secs"
+      else
+        state_info = curr_state
+      end
       if changed
-        logger.info "(#{group_id}) (#{name}) #{curr_state}"
+        logger.info "(#{group_id}) (#{name}) #{state_info}"
       end
     end
 
