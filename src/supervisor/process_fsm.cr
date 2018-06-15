@@ -53,8 +53,7 @@ module Supervisor
           event = @chan.receive
           break if event == Event::SHUTDOWN && @state.stopped?
           process_event event
-          next if @state != State::BACKOFF
-          handle_backoff
+          handle_backoff if @state == State::BACKOFF
         end
       end
     end
