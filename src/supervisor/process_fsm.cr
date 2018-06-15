@@ -79,28 +79,27 @@ module Supervisor
       prev_state = @state
       case {state, event}
 
-      when {State::STOPPED, Event::START}
+      when {State::STOPPED, Event::START},
+           {State::FATAL, Event::START},
+           {State::EXITED, Event::START},
+           {State::BACKOFF, Event::START}
         @state = State::STARTING
         start_process
 
-      when {State::FATAL, Event::START}
-        @state = State::STARTING
-        start_process
+      when {State::STARTING, Event::STOP},
+           {State::RUNNING, Event::STOP},
+           {State::RETRYING, Event::STOP}
+        @state = State::STOPPING
+        stop_process
+      when {State::BACKOFF, Event::STOP}
+        @state = State::STOPPED
 
-      # only reached when autorestart = false
-      when {State::EXITED, Event::START}
-        @state = State::STARTING
-        start_process
-
-      when {State::STARTING, Event::STARTED}
+      when {State::STARTING, Event::STARTED},
+           {State::RETRYING, Event::STARTED}
         @state = State::RUNNING
 
       when {State::STARTING, Event::EXITED}
         @state = State::FATAL
-
-      when {State::STARTING, Event::STOP}
-        @state = State::STOPPING
-        stop_process
 
       when {State::RUNNING, Event::EXITED}
         @state = State::EXITED
@@ -110,29 +109,11 @@ module Supervisor
           start_process
         end
 
-      when {State::RUNNING, Event::STOP}
-        @state = State::STOPPING
-        stop_process
-
-      when {State::RETRYING, Event::STARTED}
-        @state = State::RUNNING
-
       when {State::RETRYING, Event::EXITED}
         @state = State::BACKOFF
         if @try_count >= @popts[:startretries]
           @state = State::FATAL
         end
-
-      when {State::RETRYING, Event::STOP}
-        @state = State::STOPPING
-        stop_process
-
-      when {State::BACKOFF, Event::START}
-        @state = State::STARTING
-        start_process
-
-      when {State::BACKOFF, Event::STOP}
-        @state = State::STOPPED
 
       when {State::BACKOFF, Event::RETRY}
         @state = State::RETRYING
