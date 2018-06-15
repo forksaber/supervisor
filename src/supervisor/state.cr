@@ -4,6 +4,7 @@ module Supervisor
     FATAL
     EXITED
     STARTING
+    RETRYING
     BACKOFF
     RUNNING
     STOPPING
@@ -13,7 +14,7 @@ module Supervisor
     end
 
     def started?
-      [STARTING, BACKOFF, RUNNING].includes? self
+      [STARTING, BACKOFF, RUNNING, RETRYING].includes? self
     end
 
     def running?

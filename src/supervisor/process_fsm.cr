@@ -66,7 +66,7 @@ module Supervisor
       event = loop do
         select
         when backoff_chan.receive
-          break Event::START
+          break Event::RETRY
         when e = @chan.receive
           break e if {Event::START, Event::STOP}.includes? e
           puts "unexpected event #{e} received in backoff state"
@@ -87,20 +87,45 @@ module Supervisor
         @state = State::STARTING
         start_process
 
+      # only reached when autorestart = false
       when {State::EXITED, Event::START}
         @state = State::STARTING
         start_process
 
       when {State::STARTING, Event::STARTED}
         @state = State::RUNNING
-        @try_count = 0
 
       when {State::STARTING, Event::EXITED}
+        @state = State::FATAL
+
+      when {State::STARTING, Event::STOP}
+        @state = State::STOPPING
+        stop_process
+
+      when {State::RUNNING, Event::EXITED}
+        @state = State::EXITED
+        @try_count = 0
+        if @popts[:autorestart]
+          @state = State::RETRYING
+          start_process
+        end
+
+      when {State::RUNNING, Event::STOP}
+        @state = State::STOPPING
+        stop_process
+
+      when {State::RETRYING, Event::STARTED}
+        @state = State::RUNNING
+
+      when {State::RETRYING, Event::EXITED}
         @state = State::BACKOFF
-        @try_count += 1
         if @try_count >= @popts[:startretries]
           @state = State::FATAL
         end
+
+      when {State::RETRYING, Event::STOP}
+        @state = State::STOPPING
+        stop_process
 
       when {State::BACKOFF, Event::START}
         @state = State::STARTING
@@ -109,22 +134,10 @@ module Supervisor
       when {State::BACKOFF, Event::STOP}
         @state = State::STOPPED
 
-      when {State::STARTING, Event::STOP}
-        @state = State::STOPPING
-        process = @process
-        stop_process(process, @popts[:stopwaitsecs]) if process
-
-      when {State::RUNNING, Event::STOP}
-        @state = State::STOPPING
-        process = @process
-        stop_process(process, @popts[:stopwaitsecs]) if process
-
-      when {State::RUNNING, Event::EXITED}
-        @state = State::EXITED
-        if @popts[:autorestart]
-          @state = State::STARTING
-          start_process
-        end
+      when {State::BACKOFF, Event::RETRY}
+        @state = State::RETRYING
+        @try_count += 1
+        start_process
 
       when {State::STOPPING, Event::EXITED}
         @state = State::STOPPED
@@ -182,6 +195,11 @@ module Supervisor
         exited = true
         fire Event::EXITED
       end
+    end
+
+    private def stop_process
+      process = @process
+      stop_process(process, @popts[:stopwaitsecs]) if process
     end
 
     private def stop_process(process : ::Process, stop_wait : Number)
