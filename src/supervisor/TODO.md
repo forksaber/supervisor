@@ -12,12 +12,14 @@ DONE
 - [x] make command strings with arguments work
 - [x] refactor state_machine to process_fsm
 - [x] application logs are not routed through sv
+- [x] add stop/start commands
+- [x] fail process.start on first spawn error and change process state to FATAL
+- [x] add linear backoff (when a RUNNING process exits...it will restarted 'startretries' times with linear backoff)
 
 PENDING
-- [ ] add linear/exponential backoff
-- [ ] take abstract socket lock when running rr
+- [ ] take abstract socket lock when running rr/start/stop commands
 - [ ] implement forced-shutdown
-- [ ] add stop/start commands
+- [ ] port to crystal 0.25.0
 
 figure out how nginx/apache does log writes with 32k buffer....with or without locks?
 
