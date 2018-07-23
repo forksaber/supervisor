@@ -18,6 +18,7 @@ DONE
 - [x] port to crystal 0.25.0
 
 PENDING
+- [ ] write tests
 - [ ] take abstract socket lock when running rr/start/stop commands
 - [ ] implement forced-shutdown
 
