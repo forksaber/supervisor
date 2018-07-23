@@ -6,8 +6,14 @@ module Crystal::SignalChildHandler
 
   @@waitpid_procs = Hash(LibC::PidT, ->({Int32, Int32})).new
   @@waiting = Hash(LibC::PidT, Channel::Buffered(Int32)).new
+  @@mutex = Mutex.new
+
+  def self.mutex
+    @@mutex
+  end
 
   def self.after_fork
+    @@mutex = Mutex.new
     @@waitpid_procs.clear
     @@waiting.each_value(&.close)
     @@waiting.clear
@@ -24,8 +30,7 @@ module Crystal::SignalChildHandler
     loop do
       pid = waitid
       return if pid == 0
-      ok = waitpid(pid)
-      sleep 0.005 if !ok
+      waitpid(pid)
     end
   end
 
@@ -46,13 +51,27 @@ module Crystal::SignalChildHandler
     end
   end
 
+  private def self.waitpid(pid : Int32) : Bool
+    if registered?(pid)
+      waitpid_registered(pid)
+    else
+      waitpid_unregistered(pid)
+    end
+  end
+
+  private def self.registered?(pid : Int32)
+    @@mutex.synchronize do
+      @@waiting.has_key?(pid) && @@waitpid_procs.has_key?(pid)
+    end
+  end
+
   # calls waitpid_proc for the given pid and sends exit_status to @waitpid channel
   # returns true if waitpid_proc was found for the given pid
   # returns false otherwise
 
-  private def self.waitpid(pid : Int32) : Bool
-    waitpid_proc = @@waitpid_procs.fetch(pid, nil)
-    return false if !waitpid_proc
+  private def self.waitpid_registered(pid : Int32)
+    waitpid_proc = @@waitpid_procs[pid]
+    chan = @@waiting[pid]
     ret, exit_code = waitpid_proc.call
     if ret == pid
       chan = @@waiting[pid]
@@ -61,6 +80,15 @@ module Crystal::SignalChildHandler
       @@waiting.delete(pid)
       @@waitpid_procs.delete(pid)
     end
+    return true
+  end
+
+  private def self.waitpid_unregistered(pid : Int32)
+    ret = LibC.waitpid(pid, out exit_code, LibC::WNOHANG)
+    if ret == -1
+      raise Errno.new("waitpid") unless Errno.value == Errno::ECHILD
+    end
+    STDERR.puts "not registered #{pid} #{ret}"
     return true
   end
 end
