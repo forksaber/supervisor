@@ -43,29 +43,49 @@ begin
   when "shutdown"
     Supervisor.shutdown
   when "start"
-    arg = ARGV.shift
+    arg = ARGV.shift?
     raise "expected argument <group>:<name>" if ! arg
     group, ok, name = arg.partition(':')
     raise "expected argument <group>:<name>" if ok != ":"
     Supervisor.start_process(group, name)
   when "stop"
-    arg = ARGV.shift
+    arg = ARGV.shift?
     raise "expected argument <group>:<name>" if ! arg
     group, ok, name = arg.partition(':')
     raise "expected argument <group>:<name>" if ok != ":"
     Supervisor.stop_process(group, name)
   when "start_job"
-    arg = ARGV.shift
+    arg = ARGV.shift?
     raise "expected argument <job_name>" if ! arg
     group, ok, job_name = arg.partition(':')
     raise "expected argument <group>:<job_name>" if ok != ":"
     Supervisor.start_job(group, job_name)
   when "stop_job"
-    arg = ARGV.shift
+    arg = ARGV.shift?
     raise "expected argument <job_name>" if ! arg
     group, ok, job_name = arg.partition(':')
     raise "expected argument <group>:<job_name>" if ok != ":"
     Supervisor.stop_job(group, job_name)
+  when "help"
+    helptext = <<-END
+    Usage sv <command> <arg0> <arg1>..
+    commands:
+      server                         starts the supervisor daemon (no jobs started)
+      rr                             starts the supervisor daemon if its not running and
+                                     restarts the managed processes in a rolling manner
+
+      fgserver                       runs the supervisor as a foreground process,
+                                     also starts the managed processes
+
+      shutdown                       stops the supervisor and all managed processes
+      status                         prints status of a running supervisor
+      start [group]:[name]           starts a specific process
+      stop  [group]:[name]           stops a specific process
+      start_job [group]:[job]        starts a specific job (a job is a collection of processes)
+      stop_job [group]:[job]         stops a specific job
+      help                           print this helptext
+    END
+    puts helptext
   else
     puts "unknown command #{command}"
   end
