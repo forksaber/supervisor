@@ -9,6 +9,7 @@ module Supervisor
     registry = ProcessRegistry.new
     on_start = ->() { nil }
     server = Server.new(registry)
+    setup_signal_handlers(server)
     server.start(on_start)
   end
 
@@ -17,10 +18,13 @@ module Supervisor
     on_start = ->() do
       spawn do
         rolling_restart
+      rescue
+        nil
       end
       nil
     end
     server = Supervisor::Server.new(registry)
+    setup_signal_handlers(server)
     server.start(on_start)
   end
 
@@ -81,6 +85,15 @@ module Supervisor
       STDERR.reopen(File.open("#{Dir.current}/log/sv.log", "a+"))
       C.setsid
       ::Process.fork { yield }
+    end
+  end
+
+  private def self.setup_signal_handlers(server)
+    signals = [Signal::INT, Signal::QUIT, Signal::TERM]
+    signals.each do |i|
+      i.trap do
+        spawn { server.shutdown }
+      end
     end
   end
 end

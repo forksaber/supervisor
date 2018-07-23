@@ -6,11 +6,12 @@ require "./rpc_api"
 module Supervisor
   class Server
 
-    alias RpcRequest = NamedTuple(name: String, args: Array(String | Int32 | Bool))
+    alias CallArgs = Array(String | Int32 | Bool)
+    alias RpcRequest = NamedTuple(name: String, args: CallArgs)
 
-    def initialize(process_manager)
+    def initialize(process_registry)
       @socket = "tmp/sv.sock"
-      @api = RpcApi.new(process_manager)
+      @api = RpcApi.new(process_registry)
     end
 
     def start(on_start : Proc(Void))
@@ -22,6 +23,11 @@ module Supervisor
           spawn handle_client(client)
         end
       end
+    end
+
+    def shutdown
+      ok, _ = @api.handle_call("shutdown", CallArgs.new)
+      exit 0 if ok
     end
 
     private def handle_client(client)
