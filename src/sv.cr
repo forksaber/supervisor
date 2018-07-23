@@ -2,6 +2,12 @@ STDIN.blocking = true
 STDOUT.blocking = true
 STDERR.blocking = true
 
+# disable restore_blocking_state
+module Crystal
+  def self.restore_blocking_state
+  end
+end
+
 require "./supervisor"
 
 def start_server

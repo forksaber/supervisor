@@ -52,12 +52,5 @@ module Supervisor
       client.close
       exit 0 if shutdown
     end
-
-    private def exit(status)
-      status = AtExitHandlers.run status
-      STDOUT.flush
-      STDERR.flush
-      ::Process.exit(status)
-    end
   end
 end
