@@ -1,27 +1,56 @@
 # supervisor
+A process supervisor (similar to python's supervisord) implemented in Crystal.
 
-TODO: Write a description here
-
-## Installation
-
-TODO: Write installation instructions here
+## Build ``` sv ```
+```
+crystal build src/sv.cr
+```
 
 ## Usage
+```sv``` is expected to be run from a directory which has the following structure:
+```
+.
+├── config
+│   ├── jobs.yml
+│   └── sv.yml
+├── log
+└── tmp
+```
+### Config
+```sv``` needs the following config files to run:
+- ```config/jobs.yml``` : used to declare job/process definitions like command, working_dir, arguments, env etc
+- ```config/sv.yml``` : used to specify no. of job instances and job config overrides.
 
-TODO: Write usage instructions here
+### Commands
+- To start the supervisor along with the process defined in jobs.yml/sv.yml use:
+  ```
+  sv rr
+  ```
 
-## Development
+- To check status use:
+  ```
+  sv status
+  ```
 
-TODO: Write development instructions here
+- To shutdown the supervisor and all the managed processes use:
+  ```
+  sv shutdown
+  ```
 
-## Contributing
-
-1. Fork it ( https://github.com/[your-github-name]/supervisor/fork )
-2. Create your feature branch (git checkout -b my-new-feature)
-3. Commit your changes (git commit -am 'Add some feature')
-4. Push to the branch (git push origin my-new-feature)
-5. Create a new Pull Request
-
-## Contributors
-
-- [[your-github-name]](https://github.com/[your-github-name]) Neeraj Bhunwal - creator, maintainer
+- To see all available commands use
+  ```
+  sv help
+  ```
+### Demo
+  A demo/ directory is included in the git repo. It includes 
+  - two shell scripts **app-a**, **app-b** which logs some text to stdout/stderr in a loop. 
+  - preconfigured ```config/jobs.yml``` and ```config/sv.yml``` which use the above scripts.
+  
+  To run the demo:
+  ```
+  $ cd demo
+  $ ../sv rr # to start sv
+  $ ../sv status # to see sv status
+  $ ../sv shutdown
+  ```
+  
