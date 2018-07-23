@@ -1,0 +1,6 @@
+#!/bin/bash
+while true; do
+  echo "out b"
+  echo "err b" >&2
+  sleep 2
+done

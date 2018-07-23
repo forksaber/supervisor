@@ -1,0 +1,16 @@
+- name: job_a
+  command: ./app-a a1 a2
+  stdout_logfile: log/a.log
+  stderr_logfile: log/a.err.log
+  redirect_stderr: false
+  startsecs: 4
+  startretries: 5
+  stopwaitsecs: 5
+  killasgroup: true
+  env:
+    PORT: "51%<process_num>02d"
+
+- name: job_b
+  command: ./app-b
+  stdout_logfile: log/b.log
+  redirect_stderr: true
