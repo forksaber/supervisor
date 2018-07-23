@@ -45,14 +45,14 @@ module Supervisor
 
     def reload(dir)
       instances, group_id, jobs = Config.read(dir)
+      h = {} of String => Process
       jobs.each do |j|
         n = instances.fetch(j.name, 0).as(Int32)
         next if n <= 0
         processes = j.to_processes(n)
-        h = {} of String => Process
         processes.each { |i| h[i.name] = i }
-        @state[group_id] = h
       end
+      @state[group_id] = h
       if ! @current_group.empty?
         @old_groups << @current_group
       end
@@ -80,11 +80,11 @@ module Supervisor
     private def shutdown_groups(groups)
       chan = Channel({Bool, String, String}).new
       count = 0
-      groups.each do |i|
-        group_data = @state[i]
+      groups.each do |group|
+        group_data = @state[group]
         group_data.each do |name, process|
           count += 1
-          spawn { ok = process.shutdown; chan.send({ok, i, name}) }
+          spawn { ok = process.shutdown; chan.send({ok, group, name}) }
         end
       end
       count.times do
