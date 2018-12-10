@@ -20,7 +20,7 @@ module Supervisor
 
     private def self.read_sv_config(path)
       config = Hash(String, InstancesData | OverridesData).from_yaml(File.read(path))
-      instances = config.fetch("instances").as(InstancesData)
+      instances = config["instances"].as(InstancesData)
       overrides = config.fetch("overrides", OverridesData.new).as(OverridesData)
       {instances, overrides}
     end

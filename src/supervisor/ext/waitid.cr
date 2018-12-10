@@ -15,6 +15,7 @@ lib LibC
     si_value : SigValT
     si_addr : Void*
     si_status : Int
+    _x : Int
     si_band : Long
     _pad : StaticArray(Int64, 9)
   end

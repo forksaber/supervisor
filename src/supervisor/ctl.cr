@@ -94,7 +94,7 @@ module Supervisor
 
     private def uptime(started_at, state)
       return "-" if state !=  State::RUNNING
-      uptime = (Time.now.epoch - started_at)
+      uptime = (Time.now.to_unix - started_at)
       mm, ss = uptime.divmod(60)
       hh, mm = mm.divmod(60)
       dd, hh = hh.divmod(24)

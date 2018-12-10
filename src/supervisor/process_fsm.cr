@@ -153,7 +153,7 @@ module Supervisor
     private def start_process
       process = ::Process.new(**spawn_opts)
       @process = process
-      @started_at = Time.now.epoch
+      @started_at = Time.now.to_unix
       logger.info "(#{group_id}) (#{name}) Pid: ##{process.pid}"
       mutex = Mutex.new
       spawn wait_process(process, mutex)

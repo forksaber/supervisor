@@ -3,3 +3,5 @@
 /bin/
 /.shards/
 *.swp
+demo/log
+demo/tmp

@@ -28,13 +28,14 @@ class Process
 
   def initialize(command : String, args = nil, env = Hash(String, String).new, input : String = "/dev/null", 
                  output : String = "/dev/null", error : String = "/dev/null", chdir : String? = nil)
-    command, argv = Process.prepare_argv(command, args, shell: false)
+    command, args = Process.prepare_args(command, args, shell: false)
     clear_env = false
-    @wait_count = 0
     mutex = Crystal::SignalChildHandler.mutex
     begin
       mutex.lock
-      @pid = Process.fork_internal(run_hooks: false) do
+      if pid = Process.fork_internal(will_exec: true)
+        @pid = pid
+      else
         begin
           LibC.setpgrp
           input_fd = File.open(input, "a+")
@@ -42,7 +43,7 @@ class Process
           error_fd = File.open(error, "a+")
           Process.exec_internal(
             command,
-            argv,
+            args,
             env,
             clear_env,
             input_fd,
@@ -52,6 +53,7 @@ class Process
           )
         rescue ex
           ex.inspect_with_backtrace STDERR
+          STDERR.flush
         ensure
           LibC._exit 127
         end
