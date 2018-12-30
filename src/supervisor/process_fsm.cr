@@ -51,8 +51,8 @@ module Supervisor
       spawn do
         loop do
           event = @chan.receive
-          break if event == Event::SHUTDOWN && @state.stopped?
           process_event event
+          break if @state == State::SHUTDOWN
           handle_backoff if @state == State::BACKOFF
         end
       end
@@ -67,7 +67,7 @@ module Supervisor
         when backoff_chan.receive
           break Event::RETRY
         when e = @chan.receive
-          break e if {Event::START, Event::STOP}.includes? e
+          break e if {Event::START, Event::STOP, Event::SHUTDOWN}.includes? e
           puts "unexpected event #{e} received in backoff state"
         end
       end
@@ -85,6 +85,7 @@ module Supervisor
         @state = State::STARTING
         start_process
 
+
       when {State::STARTING, Event::STOP},
            {State::RUNNING, Event::STOP},
            {State::RETRYING, Event::STOP}
@@ -92,6 +93,22 @@ module Supervisor
         stop_process
       when {State::BACKOFF, Event::STOP}
         @state = State::STOPPED
+
+
+      when {State::STARTING, Event::SHUTDOWN},
+           {State::RUNNING, Event::SHUTDOWN},
+           {State::RETRYING, Event::SHUTDOWN}
+        @state = State::SHUTTING_DOWN
+        stop_process
+      when {State::STOPPING, Event::SHUTDOWN}
+        @state = State::SHUTTING_DOWN
+      when {State::STOPPED, Event::SHUTDOWN},
+           {State::FATAL, Event::SHUTDOWN},
+           {State::EXITED, Event::SHUTDOWN},
+           {State::BACKOFF, Event::SHUTDOWN}
+        @state = State::SHUTDOWN
+      when {State::SHUTTING_DOWN, Event::EXITED}
+        @state = State::SHUTDOWN
 
       when {State::STARTING, Event::STARTED},
            {State::RETRYING, Event::STARTED}

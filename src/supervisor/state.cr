@@ -8,9 +8,11 @@ module Supervisor
     BACKOFF
     RUNNING
     STOPPING
+    SHUTTING_DOWN
+    SHUTDOWN
 
     def stopped?
-      [STOPPED, FATAL].includes? self
+      [STOPPED, FATAL, SHUTDOWN].includes? self
     end
 
     def started?

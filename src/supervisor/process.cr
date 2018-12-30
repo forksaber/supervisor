@@ -1,7 +1,6 @@
 require "./process_fsm"
 require "./ext/process"
 require "./logger"
-require "atomic"
 
 module Supervisor
   alias ProcessData = NamedTuple(name: String, group_id: String, state: State, pid: Int32, started_at: Int64)
@@ -13,15 +12,8 @@ module Supervisor
     @fsm : ProcessFSM
     delegate state, name, group_id, pid, started_at, to: @fsm
 
-    enum Shutdown
-      NOT_STARTED
-      IN_PROGRESS
-      COMPLETED
-    end
-
     def initialize(tuple : ProcessTuple)
       @fsm = ProcessFSM.new(tuple)
-      @shutdown = Atomic(Shutdown).new(Shutdown::NOT_STARTED)
     end
 
     def to_h
@@ -87,14 +79,18 @@ module Supervisor
     end
 
     def shutdown
-      return true if @shutdown.get == Shutdown::COMPLETED
-      return false if @shutdown.get == Shutdown::IN_PROGRESS
-      _, ok = @shutdown.compare_and_set(Shutdown::NOT_STARTED, Shutdown::IN_PROGRESS)
-      return false if ! ok
-      stop
+      state = self.state
+      return true if state.shutdown?
+      unsubscribe_proc = ->(prev : State, current : State) do
+        current.shutdown? ? true : false
+      end
+      chan = Channel(Bool).new(1)
+      callback = ->(prev : State, current : State) do
+        chan.send(true) if current.shutdown?
+      end
+      @fsm.subscribe(callback, unsubscribe_proc)
       fire Event::SHUTDOWN
-      @shutdown.set(Shutdown::COMPLETED)
-      true
+      chan.receive
     end
 
     private def fire(event)
