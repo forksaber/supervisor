@@ -20,7 +20,7 @@ module Supervisor
         puts "server started on #{@socket}"
         on_start.call
         while client = server.accept?
-          spawn handle_client(client)
+          spawn handle_client(client, server)
         end
       end
     end
@@ -30,7 +30,7 @@ module Supervisor
       exit 0 if ok
     end
 
-    private def handle_client(client)
+    private def handle_client(client, server)
       shutdown = loop do
         json = NetString.read(client)
         break false if ! json
@@ -56,7 +56,10 @@ module Supervisor
     ensure
       puts "client disconnected"
       client.close
-      exit 0 if shutdown
+      if shutdown
+        server.close
+        exit 0
+      end
     end
   end
 end
