@@ -38,7 +38,7 @@ module Supervisor
     ctl.status
     true
   rescue e : Errno
-    raise e if e.errno != Errno::ECONNREFUSED
+    raise e if ! ( e.errno == Errno::ECONNREFUSED || e.errno == Errno::ENOENT )
     false
   end
 
